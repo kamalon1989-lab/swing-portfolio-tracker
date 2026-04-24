@@ -1066,7 +1066,7 @@ async function pushToCloud() {
 }
 
 async function pullFromCloud() {
-  if (!currentUser || !firebaseConfig.databaseURL || firebaseConfig.databaseURL.includes('YOUR_PROJECT')) return;
+  if (!currentUser || !firebaseConfig.databaseURL || firebaseConfig.databaseURL.includes('YOUR_PROJECT')) return false;
   setCloudStatus('🔄 불러오는 중...', 'var(--amber)');
   try {
     const token = await currentUser.getIdToken();
@@ -1082,9 +1082,12 @@ async function pullFromCloud() {
       if (d.hi) save(K.history, d.hi);
       if (d.c !== undefined) save(K.cash, d.c);
       _suppressPush = false;
+      setCloudStatus('✅ Firebase 연결됨', 'var(--green)');
+      return true;
     }
-    setCloudStatus('✅ Firebase 연결됨', 'var(--green)');
-  } catch(e) { setCloudStatus('⚠️ 다운로드 실패', 'var(--red)'); }
+    setCloudStatus('✅ Firebase 연결됨 (새 계정)', 'var(--green)');
+    return false;
+  } catch(e) { setCloudStatus('⚠️ 다운로드 실패', 'var(--red)'); return false; }
 }
 
 // ─────────────────────────────────────────────
@@ -1095,7 +1098,11 @@ async function initApp() {
   if (App.krw) $('krwToggle').classList.add('on');
   setupPctInputs();
   setCloudStatus('🔄 데이터 불러오는 중...', 'var(--amber)');
-  await pullFromCloud();
+  const hadCloudData = await pullFromCloud();
+  // Firebase에 데이터 없는데 localStorage에 기존 데이터가 있으면 즉시 Firebase에 백업
+  if (!hadCloudData && (load(K.holdings) || load(K.journal) || load(K.watch))) {
+    await pushToCloud();
+  }
   render();
   initTvWidgets();
   if (localStorage.getItem(K.key)) refreshPrices();
