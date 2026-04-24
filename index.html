@@ -186,6 +186,21 @@ tbody td:first-child { text-align: left; padding-left: 0; }
 .user-avatar { width:28px; height:28px; border-radius:50%; object-fit:cover; }
 .user-name { font-size:12px; font-weight:500; color:var(--sub); max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+/* ── MOBILE CARD LIST ── */
+.m-card-list { }
+.m-card { padding: 14px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
+.m-card:active { background: var(--hover-bg); }
+.m-card.open { background: var(--hover-bg); }
+.m-card.open .tick-arrow { transform: rotate(180deg); }
+.m-card-row1 { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.m-card-row2 { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--sub); }
+.m-card-detail { display: none; }
+.m-card-detail .detail-wrap { margin: 0; border-radius: 0; }
+
+/* ── FAB (Floating Action Button) ── */
+.fab { display: none; position: fixed; right: 18px; bottom: 76px; width: 50px; height: 50px; border-radius: 50%; background: var(--blue); color: #fff; border: none; font-size: 26px; line-height: 1; cursor: pointer; box-shadow: 0 4px 18px rgba(37,99,235,.45); z-index: 98; align-items: center; justify-content: center; transition: transform .15s, box-shadow .15s; }
+.fab:active { transform: scale(0.91); box-shadow: 0 2px 8px rgba(37,99,235,.4); }
+
 /* ── MOBILE BOTTOM NAV ── */
 .mobile-nav { display:none; position:fixed; bottom:0; left:0; right:0; background:var(--card); border-top:1px solid var(--border); z-index:100; padding-bottom:env(safe-area-inset-bottom); }
 .mobile-nav button { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:8px 4px 10px; border:none; background:none; font-size:10px; color:var(--sub); cursor:pointer; gap:3px; transition:color .15s; }
@@ -208,21 +223,21 @@ tbody td:first-child { text-align: left; padding-left: 0; }
   /* 모바일 하단 탭 표시 */
   .mobile-nav { display: flex; }
 
+  /* FAB 표시 */
+  .fab { display: flex; }
+
   /* 컨테이너 */
-  .container { padding: 10px 8px; }
+  .container { padding: 10px 0; }
 
   /* 카드 2열 */
-  .cards { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .cards { grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 0 8px; }
   .card { padding: 11px 12px; }
   .card-value { font-size: 16px; }
 
   /* 섹션 */
-  .section { padding: 12px 10px; }
-  .section-header { flex-wrap: wrap; gap: 8px; }
-
-  /* 테이블 가로 스크롤 */
-  .section > div[id] { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  tbody td, thead th { padding: 8px 5px; font-size: 12px; }
+  .section { padding: 12px 0; border-radius: 0; }
+  .section-header { padding: 0 14px 10px; flex-wrap: wrap; gap: 8px; margin-bottom: 0; }
+  .section-note { display: none; }
 
   /* 어코디언 상세 세로 스택 */
   .detail-wrap { flex-direction: column; height: auto; padding: 12px; gap: 12px; }
@@ -234,11 +249,14 @@ tbody td:first-child { text-align: left; padding-left: 0; }
   .form-row { grid-template-columns: 1fr; gap: 0; }
 
   /* 저널 필터 */
-  .journal-filters { gap: 6px; }
+  .journal-filters { gap: 6px; padding: 0 14px; }
   .journal-filters select, .journal-filters input { font-size: 12px; }
+  #journalWrap { overflow-x: auto; }
+  #journalWrap table { min-width: 640px; }
 
-  /* TP/SL 바 모바일 축소 */
-  .sl-tp-bar { width: 70px; }
+  /* 히트맵/핫리스트 위젯 모바일 숨김 */
+  .grid-2 { display: none; }
+  #earnings-container { padding: 0 14px; }
 }
 </style>
 </head>
@@ -392,6 +410,9 @@ tbody td:first-child { text-align: left; padding-left: 0; }
     </div>
   </div>
 </div>
+
+<!-- ══ FAB ══ -->
+<button class="fab" id="fab" onclick="openAddHolding()">＋</button>
 
 <!-- ══ MOBILE BOTTOM NAV ══ -->
 <nav class="mobile-nav">
@@ -637,7 +658,7 @@ function setupPctInputs() {
 //  API & PRICE & EARNINGS FETCH
 // ─────────────────────────────────────────────
 function openApiKeyModal() { $('api-finnhub').value = localStorage.getItem(K.key)||''; $('apiModal').classList.add('show'); }
-function saveApiKeys() { localStorage.setItem(K.key, $('api-finnhub').value.trim()); closeModal('apiModal'); refreshPrices(); toast('✅ API 키 저장 완료'); }
+function saveApiKeys() { localStorage.setItem(K.key, $('api-finnhub').value.trim()); schedulePush(); closeModal('apiModal'); refreshPrices(); toast('✅ API 키 저장 완료'); }
 
 function detectMarketState() {
   const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })); const mins = et.getHours() * 60 + et.getMinutes();
@@ -787,8 +808,9 @@ async function toggleRow(type, ticker) {
   const rowKey = `${type}-${ticker}`;
   const tr = $(`detail-${type}-${ticker}`);
   const wrap = $(`wrap-${type}-${ticker}`);
+  const openDisplay = tr.tagName === 'TR' ? 'table-row' : 'block';
 
-  if (tr.style.display === 'table-row') {
+  if (tr.style.display === openDisplay) {
     tr.style.display = 'none'; $(`main-${type}-${ticker}`).classList.remove('open');
     App.openRow = null; wrap.innerHTML = ''; return;
   }
@@ -799,7 +821,7 @@ async function toggleRow(type, ticker) {
   }
 
   App.openRow = rowKey;
-  tr.style.display = 'table-row'; $(`main-${type}-${ticker}`).classList.add('open');
+  tr.style.display = openDisplay; $(`main-${type}-${ticker}`).classList.add('open');
   wrap.innerHTML = `<div style="text-align:center;width:100%;padding:80px;color:var(--sub);"><span class="spinner"></span> <strong>${ticker}</strong> 차트 및 뉴스 로딩 중...</div>`;
 
   const actionBtns = type==='holding'
@@ -855,53 +877,81 @@ function renderCards() {
 
 function renderTable() {
   const h=load(K.holdings)||[];
-  if (!h.length) { $('portfolioWrap').innerHTML='<div class="empty-state"><div class="icon">📭</div><div class="title">보유 종목이 없습니다</div><div class="desc">상단 ＋ 보유 추가 버튼으로 종목을 등록하세요</div></div>'; $('marketStateBadge').innerHTML=''; return; }
+  if (!h.length) { $('portfolioWrap').innerHTML='<div class="empty-state"><div class="icon">📭</div><div class="title">보유 종목이 없습니다</div><div class="desc">＋ 보유 추가 버튼으로 종목을 등록하세요</div></div>'; $('marketStateBadge').innerHTML=''; return; }
   let totalVal=0;
   let rows=h.map(x=>{ const px=App.px[x.ticker]; const price=px?px.price:0; const curVal=price*x.shares; const costVal=x.avgCost*x.shares; totalVal+=curVal; return {...x, px, price, curVal, pnl:curVal-costVal, pnlPct:costVal?(curVal-costVal)/costVal*100:0, dayChgPct:px?.changePercent||0}; });
   rows.forEach(r=>r.weight=totalVal?(r.curVal/totalVal)*100:0);
   rows.sort((a,b)=>{ let vA=a[App.sort],vB=b[App.sort]; if(typeof vA==='string') return App.asc?vA.localeCompare(vB):vB.localeCompare(vA); return App.asc?vA-vB:vB-vA; });
   const maxW=Math.max(...rows.map(r=>r.weight),1);
 
-  $('portfolioWrap').innerHTML=`<table>
-    <thead><tr>
-      <th class="sortable" onclick="setSort('ticker')" style="padding-left:24px;">종목${sortIcon('ticker')}</th>
-      <th class="sortable" onclick="setSort('price')">현재가${sortIcon('price')}</th>
-      <th class="sortable" onclick="setSort('shares')">수량${sortIcon('shares')}</th>
-      <th class="sortable" onclick="setSort('avgCost')">평균단가${sortIcon('avgCost')}</th>
-      <th class="sortable" onclick="setSort('curVal')">평가금액${sortIcon('curVal')}</th>
-      <th class="sortable" onclick="setSort('pnl')">손익${sortIcon('pnl')}</th>
-      <th class="sortable" onclick="setSort('pnlPct')">수익률${sortIcon('pnlPct')}</th>
-      <th class="sortable" onclick="setSort('dayChgPct')">오늘${sortIcon('dayChgPct')}</th>
-      <th>목표/손절</th>
-      <th style="text-align:left;">메모</th>
-      <th style="padding-right:24px;">비중</th>
-    </tr></thead>
-    <tbody>${rows.map(r=>{
-      let tpSlHtml='<span class="c-gray" style="font-size:11px;">—</span>';
-      if (r.targetPrice||r.stopLoss) {
-        const tp=r.targetPrice||0; const sl=r.stopLoss||0; let badge='';
-        if (r.price>0) { if(tp&&r.price>=tp) badge='<br><span class="badge-alert badge-target">🎯 목표 달성</span>'; else if(sl&&r.price<=sl) badge='<br><span class="badge-alert badge-sl">🔻 손절 이탈</span>'; }
-        let barHtml=''; if(tp&&sl&&r.price>0){ const range=tp-sl; const pct=range>0?Math.min(100,Math.max(0,((r.price-sl)/range)*100)):50; const bColor=r.price>=tp?'var(--green)':r.price<=sl?'var(--red)':'var(--blue)'; barHtml=`<div class="sl-tp-bar"><div class="sl-tp-fill" style="width:${pct.toFixed(0)}%;background:${bColor};"></div></div>`; }
-        tpSlHtml=`<div class="sl-tp-wrap">${tp?`<div class="sl-tp-label c-green">🎯 ${fmtUSD(tp)}</div>`:''}${sl?`<div class="sl-tp-label c-red">🔻 ${fmtUSD(sl)}</div>`:''}${barHtml}${badge}</div>`;
-      }
-      const isOpen=App.openRow===`holding-${r.ticker}`;
+  if (window.innerWidth <= 640) {
+    $('portfolioWrap').innerHTML = `<div class="m-card-list">${rows.map(r => {
+      const isOpen = App.openRow === `holding-${r.ticker}`;
+      const tpBadge = r.price&&r.targetPrice&&r.price>=r.targetPrice ? '<span class="badge-alert badge-target" style="margin-left:6px;">🎯 목표 달성</span>'
+                    : r.price&&r.stopLoss&&r.price<=r.stopLoss ? '<span class="badge-alert badge-sl" style="margin-left:6px;">🔻 손절 이탈</span>' : '';
       return `
-      <tr id="main-holding-${r.ticker}" class="main-row${isOpen?' open':''}" onclick="toggleRow('holding','${r.ticker}')" title="클릭 → 차트 및 상세 정보">
-        <td style="padding-left:24px;"><div class="tick">${r.ticker} <span class="tick-arrow">▼</span></div><div class="cname">${r.name||''}</div></td>
-        <td><strong>${r.price?fmtUSD(r.price):'<span class="spinner"></span>'}</strong></td>
-        <td>${r.shares}</td><td class="c-gray">${fmtUSD(r.avgCost)}</td>
-        <td><strong>${r.price?fmtAmt(r.curVal):'—'}</strong></td>
-        <td class="${cls(r.pnl)}">${r.price?(r.pnl>=0?'+':'')+fmtAmt(r.pnl):'—'}</td>
-        <td class="${cls(r.pnlPct)}">${r.price?fmtPct(r.pnlPct):'—'}</td>
-        <td class="${cls(r.dayChgPct)}">${r.price?fmtPct(r.dayChgPct):'—'}</td>
-        <td>${tpSlHtml}</td>
-        <td style="text-align:left;font-size:11.5px;color:var(--sub);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${r.note||''}">${r.note||'—'}</td>
-        <td style="padding-right:24px;"><div class="w-wrap"><span class="c-gray" style="font-size:11px;">${r.weight.toFixed(1)}%</span><div class="w-bar"><div class="w-fill" style="width:${(r.weight/maxW*100).toFixed(0)}%"></div></div></div></td>
-      </tr>
-      <tr id="detail-holding-${r.ticker}" class="detail-row" style="display:${isOpen?'table-row':'none'};">
-        <td colspan="11"><div class="detail-wrap" id="wrap-holding-${r.ticker}"></div></td>
-      </tr>`;
-    }).join('')}</tbody></table>`;
+      <div>
+        <div id="main-holding-${r.ticker}" class="m-card${isOpen?' open':''}" onclick="toggleRow('holding','${r.ticker}')">
+          <div class="m-card-row1">
+            <div><div class="tick" style="font-size:15px;">${r.ticker} <span class="tick-arrow">▼</span></div><div class="cname">${r.name||''}</div></div>
+            <div style="text-align:right;">
+              <div style="font-size:15px;font-weight:700;" class="${cls(r.pnl)}">${r.price?(r.pnl>=0?'+':'')+fmtAmt(r.pnl):'—'}</div>
+              <div style="font-size:12px;font-weight:600;" class="${cls(r.pnlPct)}">${r.price?fmtPct(r.pnlPct):'—'}</div>
+            </div>
+          </div>
+          <div class="m-card-row2">
+            <span>${r.shares}주 · ${fmtUSD(r.avgCost)}</span>
+            <span style="color:var(--text);font-weight:500;">${r.price?fmtAmt(r.curVal):'<span class="spinner"></span>'}</span>
+            <span class="${cls(r.dayChgPct)}">${r.price?'오늘 '+fmtPct(r.dayChgPct):'—'}${tpBadge}</span>
+          </div>
+        </div>
+        <div id="detail-holding-${r.ticker}" class="m-card-detail" style="display:${isOpen?'block':'none'};">
+          <div class="detail-wrap" id="wrap-holding-${r.ticker}"></div>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  } else {
+    $('portfolioWrap').innerHTML=`<table>
+      <thead><tr>
+        <th class="sortable" onclick="setSort('ticker')" style="padding-left:24px;">종목${sortIcon('ticker')}</th>
+        <th class="sortable" onclick="setSort('price')">현재가${sortIcon('price')}</th>
+        <th class="sortable" onclick="setSort('shares')">수량${sortIcon('shares')}</th>
+        <th class="sortable" onclick="setSort('avgCost')">평균단가${sortIcon('avgCost')}</th>
+        <th class="sortable" onclick="setSort('curVal')">평가금액${sortIcon('curVal')}</th>
+        <th class="sortable" onclick="setSort('pnl')">손익${sortIcon('pnl')}</th>
+        <th class="sortable" onclick="setSort('pnlPct')">수익률${sortIcon('pnlPct')}</th>
+        <th class="sortable" onclick="setSort('dayChgPct')">오늘${sortIcon('dayChgPct')}</th>
+        <th>목표/손절</th>
+        <th style="text-align:left;">메모</th>
+        <th style="padding-right:24px;">비중</th>
+      </tr></thead>
+      <tbody>${rows.map(r=>{
+        let tpSlHtml='<span class="c-gray" style="font-size:11px;">—</span>';
+        if (r.targetPrice||r.stopLoss) {
+          const tp=r.targetPrice||0; const sl=r.stopLoss||0; let badge='';
+          if (r.price>0) { if(tp&&r.price>=tp) badge='<br><span class="badge-alert badge-target">🎯 목표 달성</span>'; else if(sl&&r.price<=sl) badge='<br><span class="badge-alert badge-sl">🔻 손절 이탈</span>'; }
+          let barHtml=''; if(tp&&sl&&r.price>0){ const range=tp-sl; const pct=range>0?Math.min(100,Math.max(0,((r.price-sl)/range)*100)):50; const bColor=r.price>=tp?'var(--green)':r.price<=sl?'var(--red)':'var(--blue)'; barHtml=`<div class="sl-tp-bar"><div class="sl-tp-fill" style="width:${pct.toFixed(0)}%;background:${bColor};"></div></div>`; }
+          tpSlHtml=`<div class="sl-tp-wrap">${tp?`<div class="sl-tp-label c-green">🎯 ${fmtUSD(tp)}</div>`:''}${sl?`<div class="sl-tp-label c-red">🔻 ${fmtUSD(sl)}</div>`:''}${barHtml}${badge}</div>`;
+        }
+        const isOpen=App.openRow===`holding-${r.ticker}`;
+        return `
+        <tr id="main-holding-${r.ticker}" class="main-row${isOpen?' open':''}" onclick="toggleRow('holding','${r.ticker}')">
+          <td style="padding-left:24px;"><div class="tick">${r.ticker} <span class="tick-arrow">▼</span></div><div class="cname">${r.name||''}</div></td>
+          <td><strong>${r.price?fmtUSD(r.price):'<span class="spinner"></span>'}</strong></td>
+          <td>${r.shares}</td><td class="c-gray">${fmtUSD(r.avgCost)}</td>
+          <td><strong>${r.price?fmtAmt(r.curVal):'—'}</strong></td>
+          <td class="${cls(r.pnl)}">${r.price?(r.pnl>=0?'+':'')+fmtAmt(r.pnl):'—'}</td>
+          <td class="${cls(r.pnlPct)}">${r.price?fmtPct(r.pnlPct):'—'}</td>
+          <td class="${cls(r.dayChgPct)}">${r.price?fmtPct(r.dayChgPct):'—'}</td>
+          <td>${tpSlHtml}</td>
+          <td style="text-align:left;font-size:11.5px;color:var(--sub);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${r.note||''}">${r.note||'—'}</td>
+          <td style="padding-right:24px;"><div class="w-wrap"><span class="c-gray" style="font-size:11px;">${r.weight.toFixed(1)}%</span><div class="w-bar"><div class="w-fill" style="width:${(r.weight/maxW*100).toFixed(0)}%"></div></div></div></td>
+        </tr>
+        <tr id="detail-holding-${r.ticker}" class="detail-row" style="display:${isOpen?'table-row':'none'};">
+          <td colspan="11"><div class="detail-wrap" id="wrap-holding-${r.ticker}"></div></td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
+  }
 
   if (App.openRow && App.openRow.startsWith('holding-')) {
     const ticker = App.openRow.slice('holding-'.length); App.openRow = null; toggleRow('holding', ticker);
@@ -911,26 +961,55 @@ function renderTable() {
 function renderWatchlist() {
   const w=load(K.watch)||[];
   if (!w.length) { $('watchlistWrap').innerHTML='<div class="empty-state"><div class="icon">👀</div><div class="title">관심 종목이 없습니다</div><div class="desc">＋ 관심 추가로 모니터링할 종목을 등록하세요</div></div>'; return; }
-  $('watchlistWrap').innerHTML=`<table>
-    <thead><tr>
-      <th style="padding-left:24px;text-align:left;">종목</th><th>현재가</th><th>목표 진입가</th><th>오늘 등락</th><th style="text-align:left;padding-right:24px;">메모</th>
-    </tr></thead>
-    <tbody>${w.map(x=>{
-      const price=App.px[x.ticker]?.price||0; const target=x.targetBuy;
-      const badge=(price&&target&&price<=target)?'<span class="badge-alert badge-target" style="margin-left:6px;">🎯 진입 구간</span>':'';
+
+  if (window.innerWidth <= 640) {
+    $('watchlistWrap').innerHTML = `<div class="m-card-list">${w.map(x => {
+      const price=App.px[x.ticker]?.price||0; const dayChg=App.px[x.ticker]?.changePercent||0; const target=x.targetBuy;
+      const badge=(price&&target&&price<=target)?'<span class="badge-alert badge-target">🎯 진입 구간</span>':'';
       const isOpen=App.openRow===`watch-${x.ticker}`;
       return `
-      <tr id="main-watch-${x.ticker}" class="main-row${isOpen?' open':''}" onclick="toggleRow('watch','${x.ticker}')" title="클릭 → 차트 및 상세 정보">
-        <td style="padding-left:24px;"><div class="tick">${x.ticker} <span class="tick-arrow">▼</span></div><div class="cname">${x.name||''}</div></td>
-        <td><strong>${price?fmtUSD(price):'<span class="spinner"></span>'}</strong></td>
-        <td>${target?fmtUSD(target):'—'}${badge}</td>
-        <td class="${cls(App.px[x.ticker]?.changePercent||0)}">${App.px[x.ticker]?fmtPct(App.px[x.ticker].changePercent):'—'}</td>
-        <td style="text-align:left;font-size:11.5px;color:var(--sub);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:24px;" title="${x.note||''}">${x.note||'—'}</td>
-      </tr>
-      <tr id="detail-watch-${x.ticker}" class="detail-row" style="display:${isOpen?'table-row':'none'};">
-        <td colspan="5"><div class="detail-wrap" id="wrap-watch-${x.ticker}"></div></td>
-      </tr>`;
-    }).join('')}</tbody></table>`;
+      <div>
+        <div id="main-watch-${x.ticker}" class="m-card${isOpen?' open':''}" onclick="toggleRow('watch','${x.ticker}')">
+          <div class="m-card-row1">
+            <div><div class="tick" style="font-size:15px;">${x.ticker} <span class="tick-arrow">▼</span></div><div class="cname">${x.name||''}</div></div>
+            <div style="text-align:right;">
+              <div style="font-size:15px;font-weight:700;">${price?fmtUSD(price):'<span class="spinner"></span>'}</div>
+              <div style="font-size:12px;font-weight:600;" class="${cls(dayChg)}">${App.px[x.ticker]?fmtPct(dayChg):'—'}</div>
+            </div>
+          </div>
+          <div class="m-card-row2">
+            <span>${target?'목표 '+fmtUSD(target):'목표가 미설정'}</span>
+            ${badge}
+            <span style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.note||''}</span>
+          </div>
+        </div>
+        <div id="detail-watch-${x.ticker}" class="m-card-detail" style="display:${isOpen?'block':'none'};">
+          <div class="detail-wrap" id="wrap-watch-${x.ticker}"></div>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  } else {
+    $('watchlistWrap').innerHTML=`<table>
+      <thead><tr>
+        <th style="padding-left:24px;text-align:left;">종목</th><th>현재가</th><th>목표 진입가</th><th>오늘 등락</th><th style="text-align:left;padding-right:24px;">메모</th>
+      </tr></thead>
+      <tbody>${w.map(x=>{
+        const price=App.px[x.ticker]?.price||0; const target=x.targetBuy;
+        const badge=(price&&target&&price<=target)?'<span class="badge-alert badge-target" style="margin-left:6px;">🎯 진입 구간</span>':'';
+        const isOpen=App.openRow===`watch-${x.ticker}`;
+        return `
+        <tr id="main-watch-${x.ticker}" class="main-row${isOpen?' open':''}" onclick="toggleRow('watch','${x.ticker}')">
+          <td style="padding-left:24px;"><div class="tick">${x.ticker} <span class="tick-arrow">▼</span></div><div class="cname">${x.name||''}</div></td>
+          <td><strong>${price?fmtUSD(price):'<span class="spinner"></span>'}</strong></td>
+          <td>${target?fmtUSD(target):'—'}${badge}</td>
+          <td class="${cls(App.px[x.ticker]?.changePercent||0)}">${App.px[x.ticker]?fmtPct(App.px[x.ticker].changePercent):'—'}</td>
+          <td style="text-align:left;font-size:11.5px;color:var(--sub);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:24px;" title="${x.note||''}">${x.note||'—'}</td>
+        </tr>
+        <tr id="detail-watch-${x.ticker}" class="detail-row" style="display:${isOpen?'table-row':'none'};">
+          <td colspan="5"><div class="detail-wrap" id="wrap-watch-${x.ticker}"></div></td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
+  }
 
   if (App.openRow && App.openRow.startsWith('watch-')) {
     const ticker = App.openRow.slice('watch-'.length); App.openRow = null; toggleRow('watch', ticker);
@@ -1093,6 +1172,7 @@ function renderJournal(){
 // ─────────────────────────────────────────────
 //  MISC & FIREBASE
 // ─────────────────────────────────────────────
+const FAB_CONFIG = { portfolio:{fn:'openAddHolding()',label:'＋'}, watchlist:{fn:'openAddWatchlist()',label:'＋'}, journal:{fn:'openAddTrade()',label:'＋'}, assets:{fn:null,label:''} };
 function switchTab(n){
   document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el=>el.classList.remove('active'));
@@ -1104,6 +1184,8 @@ function switchTab(n){
   if(n==='watchlist')btns[2].classList.add('active');
   if(n==='journal')btns[3].classList.add('active');
   const mn=$('mnav-'+n); if(mn) mn.classList.add('active');
+  const fab=$('fab'); const fc=FAB_CONFIG[n];
+  if(fab){ if(fc&&fc.fn){ fab.setAttribute('onclick',fc.fn); fab.style.display=''; } else { fab.style.display='none'; } }
   window.scrollTo(0,0);
 }
 function closeModal(id){$(id).classList.remove('show');}
