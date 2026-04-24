@@ -185,6 +185,61 @@ tbody td:first-child { text-align: left; padding-left: 0; }
 .user-profile { display:flex; align-items:center; gap:8px; }
 .user-avatar { width:28px; height:28px; border-radius:50%; object-fit:cover; }
 .user-name { font-size:12px; font-weight:500; color:var(--sub); max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* ── MOBILE BOTTOM NAV ── */
+.mobile-nav { display:none; position:fixed; bottom:0; left:0; right:0; background:var(--card); border-top:1px solid var(--border); z-index:100; padding-bottom:env(safe-area-inset-bottom); }
+.mobile-nav button { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:8px 4px 10px; border:none; background:none; font-size:10px; color:var(--sub); cursor:pointer; gap:3px; transition:color .15s; }
+.mobile-nav button .nav-icon { font-size:20px; line-height:1; }
+.mobile-nav button.active { color:var(--blue); }
+
+/* ── MOBILE RESPONSIVE ── */
+@media (max-width: 640px) {
+  body { padding-bottom: 62px; }
+
+  /* 헤더 */
+  .app-header { padding: 10px 14px; gap: 8px; flex-wrap: nowrap; min-height: 0; }
+  .app-date { display: none; }
+  .tabs { display: none; }
+  .price-status { display: none; }
+  .user-name { display: none; }
+  .hide-mobile { display: none; }
+  .header-right { gap: 5px; }
+
+  /* 모바일 하단 탭 표시 */
+  .mobile-nav { display: flex; }
+
+  /* 컨테이너 */
+  .container { padding: 10px 8px; }
+
+  /* 카드 2열 */
+  .cards { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .card { padding: 11px 12px; }
+  .card-value { font-size: 16px; }
+
+  /* 섹션 */
+  .section { padding: 12px 10px; }
+  .section-header { flex-wrap: wrap; gap: 8px; }
+
+  /* 테이블 가로 스크롤 */
+  .section > div[id] { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  tbody td, thead th { padding: 8px 5px; font-size: 12px; }
+
+  /* 어코디언 상세 세로 스택 */
+  .detail-wrap { flex-direction: column; height: auto; padding: 12px; gap: 12px; }
+  .tv-box { height: 260px; flex: none; }
+  .news-box { flex: none; }
+
+  /* 모달 */
+  .modal { padding: 18px 16px; }
+  .form-row { grid-template-columns: 1fr; gap: 0; }
+
+  /* 저널 필터 */
+  .journal-filters { gap: 6px; }
+  .journal-filters select, .journal-filters input { font-size: 12px; }
+
+  /* TP/SL 바 모바일 축소 */
+  .sl-tp-bar { width: 70px; }
+}
 </style>
 </head>
 <body>
@@ -213,7 +268,7 @@ tbody td:first-child { text-align: left; padding-left: 0; }
   <div class="header-right">
     <div class="price-status" id="priceStatus"><span class="dot" id="statusDot"></span><span id="statusText">-</span></div>
     <button class="btn btn-secondary refresh-btn btn-sm" id="refreshBtn" onclick="refreshPrices()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> 새로고침
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><span class="hide-mobile"> 새로고침</span>
     </button>
     <button class="toggle-btn" id="krwToggle" onclick="toggleKRW()">₩ 원화</button>
     <button class="toggle-btn" onclick="toggleTheme()">🌙</button>
@@ -337,6 +392,14 @@ tbody td:first-child { text-align: left; padding-left: 0; }
     </div>
   </div>
 </div>
+
+<!-- ══ MOBILE BOTTOM NAV ══ -->
+<nav class="mobile-nav">
+  <button id="mnav-portfolio" onclick="switchTab('portfolio')"><span class="nav-icon">💼</span>포트폴리오</button>
+  <button id="mnav-assets"    onclick="switchTab('assets')"><span class="nav-icon">📈</span>자산 분석</button>
+  <button id="mnav-watchlist" onclick="switchTab('watchlist')"><span class="nav-icon">👀</span>관심 종목</button>
+  <button id="mnav-journal"   onclick="switchTab('journal')"><span class="nav-icon">📒</span>매매 일지</button>
+</nav>
 
 <!-- ══ MODALS ══ -->
 
@@ -1033,12 +1096,15 @@ function renderJournal(){
 function switchTab(n){
   document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.mobile-nav button').forEach(el=>el.classList.remove('active'));
   $('tab-'+n).classList.add('active');
   const btns=document.querySelectorAll('.tab-btn');
-  if(n==='portfolio'){btns[0].classList.add('active'); initTvWidgets(); } 
+  if(n==='portfolio'){btns[0].classList.add('active'); initTvWidgets(); }
   if(n==='assets'){btns[1].classList.add('active');if(App.chartDonut)renderDonut();if(App.chartLine)renderChart();}
   if(n==='watchlist')btns[2].classList.add('active');
   if(n==='journal')btns[3].classList.add('active');
+  const mn=$('mnav-'+n); if(mn) mn.classList.add('active');
+  window.scrollTo(0,0);
 }
 function closeModal(id){$(id).classList.remove('show');}
 
@@ -1059,7 +1125,7 @@ async function pushToCloud() {
   try {
     const token = await currentUser.getIdToken();
     const url = `${firebaseConfig.databaseURL}/users/${currentUser.uid}/ptf.json?auth=${token}`;
-    const res = await fetch(url, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({h:load(K.holdings),w:load(K.watch),j:load(K.journal),hi:load(K.history),c:load(K.cash)}) });
+    const res = await fetch(url, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({h:load(K.holdings),w:load(K.watch),j:load(K.journal),hi:load(K.history),c:load(K.cash),k:localStorage.getItem(K.key)||null}) });
     if (!res.ok) throw new Error();
     setCloudStatus('✅ 동기화 완료', 'var(--green)');
   } catch(e) { setCloudStatus('⚠️ 업로드 실패', 'var(--red)'); }
@@ -1081,6 +1147,7 @@ async function pullFromCloud() {
       if (d.j) save(K.journal, d.j);
       if (d.hi) save(K.history, d.hi);
       if (d.c !== undefined) save(K.cash, d.c);
+      if (d.k) localStorage.setItem(K.key, d.k);
       _suppressPush = false;
       setCloudStatus('✅ Firebase 연결됨', 'var(--green)');
       return true;
@@ -1095,6 +1162,7 @@ async function pullFromCloud() {
 // ─────────────────────────────────────────────
 async function initApp() {
   $('headerDate').textContent = new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'});
+  $('mnav-portfolio').classList.add('active');
   if (App.krw) $('krwToggle').classList.add('on');
   setupPctInputs();
   setCloudStatus('🔄 데이터 불러오는 중...', 'var(--amber)');
