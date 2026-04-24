@@ -461,9 +461,15 @@ function signOut() {
   fbAuth.signOut();
 }
 
+const DATA_KEYS = ['ptf_h2','ptf_hist','ptf_px','ptf_cash','ptf_journal','ptf_watch'];
+function clearLocalData() { DATA_KEYS.forEach(k => localStorage.removeItem(k)); }
+
+let _lastUid = null;
 fbAuth.onAuthStateChanged(user => {
   currentUser = user;
   if (user) {
+    if (_lastUid && _lastUid !== user.uid) clearLocalData();
+    _lastUid = user.uid;
     $('loginScreen').style.display = 'none';
     const avatar = $('userAvatar');
     if (user.photoURL) { avatar.src = user.photoURL; avatar.style.display = 'block'; } else { avatar.style.display = 'none'; }
@@ -471,6 +477,8 @@ fbAuth.onAuthStateChanged(user => {
     $('userProfile').style.display = 'flex';
     initApp();
   } else {
+    clearLocalData();
+    _lastUid = null;
     $('loginScreen').style.display = 'flex';
     $('userProfile').style.display = 'none';
   }
