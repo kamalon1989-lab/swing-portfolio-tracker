@@ -270,6 +270,15 @@ tbody td:first-child { text-align: left; padding-left: 0; }
   /* 히트맵/핫리스트 위젯 모바일 숨김 */
   .grid-2 { display: none; }
   #earnings-container { padding: 0 14px; }
+
+  /* 카드 래퍼 — 데스크톱용 -18px 네거티브 마진 제거 */
+  #portfolioWrap, #watchlistWrap { margin: 0 !important; }
+
+  /* 타이틀 숨김 강제 적용 */
+  .app-title { display: none !important; }
+
+  /* 페이지 가로 오버플로 방지 */
+  html, body { overflow-x: hidden; }
 }
 </style>
 </head>
@@ -303,7 +312,7 @@ tbody td:first-child { text-align: left; padding-left: 0; }
     </button>
     <button class="toggle-btn" id="krwToggle" onclick="toggleKRW()">₩ 원화</button>
     <button class="toggle-btn" onclick="toggleTheme()">🌙</button>
-    <button class="btn btn-primary btn-sm" onclick="openAddHolding()">＋ 보유 추가</button>
+    <button class="btn btn-primary btn-sm hide-mobile" onclick="openAddHolding()">＋ 보유 추가</button>
 
     <!-- ⚙️ 설정 드롭다운 -->
     <div class="settings-wrap" id="settingsWrap">
