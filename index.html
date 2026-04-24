@@ -378,8 +378,10 @@ tbody td:first-child { text-align: left; padding-left: 0; }
     </div>
 
     <!-- 3. 실적 발표 캘린더 -->
-    <div class="section" style="margin-top:14px; margin-bottom:0; height:450px; display:flex; flex-direction:column;">
-      <div class="section-header" style="margin-bottom: 8px;"><span class="section-title">📅 내 종목 실적 발표 (향후 2주)</span></div>
+    <div class="section" style="margin-top:14px; margin-bottom:0; height:520px; display:flex; flex-direction:column;">
+      <div class="section-header" style="margin-bottom: 8px;">
+        <span class="section-title">📅 내 종목 실적 발표 <span style="font-size:12px;font-weight:400;color:var(--sub);">— 과거 7일 · 향후 3주</span></span>
+      </div>
       <div id="earnings-container" style="flex:1; overflow-y:auto; padding-right:4px;">
          <div style="text-align:center; padding:60px 20px; color:var(--sub);"><span class="spinner"></span> 실적 데이터를 불러오는 중...</div>
       </div>
@@ -519,6 +521,21 @@ tbody td:first-child { text-align: left; padding-left: 0; }
 
 <div class="modal-overlay" id="cashModal"><div class="modal" style="width:340px;"><h2>예수금 입력</h2><div class="form-group"><label>금액 (USD)</label><input id="cm-cash" type="number" step="0.01" min="0" placeholder="0.00"></div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal('cashModal')">취소</button><button class="btn btn-primary" onclick="saveCash()">저장</button></div></div></div>
 
+<div class="modal-overlay" id="recordModal" onclick="if(event.target===this)closeModal('recordModal')">
+  <div class="modal" style="width:360px;">
+    <h2>📌 기록 날짜 선택</h2>
+    <p style="font-size:13px;color:var(--sub);margin-bottom:16px;line-height:1.6;">현재 기준 날짜를 확인해주세요.<br>애프터마켓이라면 미국 장 기준 날짜로 변경할 수 있습니다.</p>
+    <div class="form-group">
+      <label class="form-label">기록 날짜</label>
+      <input type="date" class="form-input" id="recordDateInput">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal('recordModal')">취소</button>
+      <button class="btn btn-primary" onclick="confirmRecordDate()">저장</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="tradeModal">
   <div class="modal">
     <h2 id="tradeModalTitle">거래 추가</h2>
@@ -601,7 +618,7 @@ const save = (k, v) => { localStorage.setItem(k, JSON.stringify(v)); if(!_suppre
 const App = { krw: load(K.krw)||false, rate: 0, px: load(K.prices)||{}, fetched: false, editH: null, editW: null, editT: null, sort: 'curVal', asc: false, chartLine: null, chartDonut: null, openRow: null };
 
 const $ = id => document.getElementById(id);
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const fmtUSD = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtKRW = n => '₩' + Math.round(n).toLocaleString('ko-KR');
 const fmtAmt = n => App.krw && App.rate ? fmtKRW(n * App.rate) : fmtUSD(n);
@@ -708,33 +725,81 @@ async function fetchFinnhubNewsRaw(ticker) {
 
 async function fetchEarnings() {
   const key = localStorage.getItem(K.key); if(!key) return;
-  const from = today();
-  const d = new Date(); d.setDate(d.getDate() + 14); const to = d.toISOString().slice(0, 10);
+  const fmtRev = n => { if(!n) return '—'; const abs=Math.abs(n); if(abs>=1e9) return '$'+(n/1e9).toFixed(2)+'B'; if(abs>=1e6) return '$'+(n/1e6).toFixed(1)+'M'; return fmtUSD(n); };
+  const fromD = new Date(); fromD.setDate(fromD.getDate()-7);
+  const toD   = new Date(); toD.setDate(toD.getDate()+21);
+  const from = `${fromD.getFullYear()}-${String(fromD.getMonth()+1).padStart(2,'0')}-${String(fromD.getDate()).padStart(2,'0')}`;
+  const to   = `${toD.getFullYear()}-${String(toD.getMonth()+1).padStart(2,'0')}-${String(toD.getDate()).padStart(2,'0')}`;
   try {
     const res = await fetch(`https://finnhub.io/api/v1/calendar/earnings?from=${from}&to=${to}&token=${key}`);
     const data = await res.json();
     const allEarnings = data.earningsCalendar || [];
-    
-    const myTickers = [...new Set([...(load(K.holdings)||[]).map(x=>x.ticker), ...(load(K.watch)||[]).map(x=>x.ticker)])];
-    const myEarnings = allEarnings.filter(e => myTickers.includes(e.symbol));
-    
+    const holdings = load(K.holdings)||[]; const watchlist = load(K.watch)||[];
+    const holdSet = new Set(holdings.map(x=>x.ticker));
+    const watchSet = new Set(watchlist.map(x=>x.ticker));
+    const myEarnings = allEarnings.filter(e => holdSet.has(e.symbol)||watchSet.has(e.symbol));
     const container = $('earnings-container');
     if(!myEarnings.length) {
-      container.innerHTML = '<div style="padding:60px 20px; text-align:center; color:var(--sub);">최근 및 향후 2주 내에 예정된<br>내 종목 실적 발표가 없습니다.</div>';
+      container.innerHTML = '<div style="padding:60px 20px; text-align:center; color:var(--sub);">최근 3주 내에 예정된<br>내 종목 실적 발표가 없습니다.</div>';
       return;
     }
-    
-    myEarnings.sort((a,b) => new Date(a.date) - new Date(b.date));
+    myEarnings.sort((a,b) => new Date(a.date)-new Date(b.date));
+    const todayStr = today();
+    const isDark = document.documentElement.getAttribute('data-theme')==='dark';
     container.innerHTML = myEarnings.map(e => {
-      const ed = new Date(e.date); const dateStr = `${ed.getMonth()+1}/${ed.getDate()}`;
-      return `
-        <div style="padding:12px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; transition:background 0.15s;">
-            <div><strong style="font-size:15px; color:var(--blue);">${e.symbol}</strong> <span style="font-size:12px; color:var(--sub); margin-left:6px;">${dateStr}</span></div>
-            <div style="text-align:right; font-size:12px; color:var(--sub);">
-                예상 EPS: <strong style="color:var(--text);">${e.epsEstimate ? e.epsEstimate.toFixed(2) : '—'}</strong><br>
-                예상 매출: <strong style="color:var(--text);">${e.revenueEstimate ? fmtUSD(e.revenueEstimate) : '—'}</strong>
-            </div>
-        </div>`;
+      const ed = new Date(e.date+'T12:00:00');
+      const td = new Date(todayStr+'T12:00:00');
+      const diff = Math.round((ed-td)/(864e5));
+      // D-Day 배지
+      let dLabel, dBg, dFg;
+      if(diff<0){ dLabel=`D${diff}`; dBg='#f3f4f6'; dFg='#9ca3af'; }
+      else if(diff===0){ dLabel='D-DAY'; dBg='#fee2e2'; dFg='#dc2626'; }
+      else if(diff<=3){ dLabel=`D-${diff}`; dBg='#ffedd5'; dFg='#ea580c'; }
+      else { dLabel=`D-${diff}`; dBg='#eff6ff'; dFg='#2563eb'; }
+      if(isDark){ dBg=dBg.replace('#f3f4f6','#374151').replace('#fee2e2','#7f1d1d').replace('#ffedd5','#7c2d12').replace('#eff6ff','#1e3a8a'); }
+      // 발표 시간 배지
+      const hourMap={'bmo':['장전','#dcfce7','#16a34a'],'amc':['장후','#fef9c3','#ca8a04'],'dmh':['장중','#e0f2fe','#0284c7']};
+      const [hLabel,hBg,hFg] = hourMap[e.hour]||['','',''];
+      // 종목 구분 배지
+      const isHold = holdSet.has(e.symbol);
+      const [tLabel,tBg,tFg] = isHold ? ['보유','#eff6ff','#2563eb'] : ['관심','#f5f3ff','#7c3aed'];
+      // EPS/매출
+      const announced = e.epsActual!==null && e.epsActual!==undefined && diff<=0;
+      let epsBlock='', revBlock='';
+      if(announced){
+        const beat = e.epsEstimate!=null ? e.epsActual>=e.epsEstimate : null;
+        const beatLabel = beat===null?'':(beat?'✅ Beat':'❌ Miss');
+        const epsColor = beat===null?'var(--text)':(beat?'var(--green)':'var(--red)');
+        epsBlock=`<div style="font-size:11px;color:var(--sub);">EPS 실적 <span style="color:${epsColor};font-weight:700;">${beatLabel}</span></div>
+          <div style="font-size:12px;font-weight:700;color:${epsColor};">${e.epsActual.toFixed(2)}</div>
+          <div style="font-size:11px;color:var(--sub);">예상 ${e.epsEstimate!=null?e.epsEstimate.toFixed(2):'—'}</div>`;
+        if(e.revenueActual) revBlock=`<div style="font-size:11px;color:var(--sub);margin-top:3px;">매출 <span style="color:var(--text);font-weight:600;">${fmtRev(e.revenueActual)}</span></div>`;
+      } else {
+        epsBlock=`<div style="font-size:11px;color:var(--sub);">예상 EPS</div>
+          <div style="font-size:13px;font-weight:700;color:var(--text);">${e.epsEstimate!=null?e.epsEstimate.toFixed(2):'—'}</div>`;
+        if(e.revenueEstimate) revBlock=`<div style="font-size:11px;color:var(--sub);margin-top:3px;">예상 매출 <span style="color:var(--text);font-weight:600;">${fmtRev(e.revenueEstimate)}</span></div>`;
+      }
+      // 현재가
+      const px=App.px[e.symbol];
+      const priceBlock=px?`<div style="font-size:12px;color:var(--sub);margin-top:3px;">${fmtUSD(px.price)} <span class="${cls(px.changePercent)}" style="font-weight:600;">${fmtPct(px.changePercent)}</span></div>`:'';
+      const dateStr=`${ed.getMonth()+1}/${ed.getDate()}`;
+      const quarter=e.quarter&&e.year?` · ${e.year} Q${e.quarter}`:'';
+      const badge=(tag,bg,fg,show)=>show?`<span style="font-size:10px;background:${bg};color:${fg};padding:2px 7px;border-radius:4px;font-weight:600;">${tag}</span>`:'';
+      return `<div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:10px;${diff<0?'opacity:0.65':''}">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:5px;">
+            <span style="font-size:16px;font-weight:700;color:var(--blue);">${e.symbol}</span>
+            ${badge(tLabel,tBg,tFg,true)}
+            ${badge(hLabel,hBg,hFg,!!hLabel)}
+          </div>
+          <div style="font-size:12px;color:var(--sub);">${dateStr}${quarter}</div>
+          ${priceBlock}
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="display:inline-block;background:${dBg};color:${dFg};font-size:13px;font-weight:700;padding:3px 10px;border-radius:6px;margin-bottom:7px;">${dLabel}</div>
+          ${epsBlock}${revBlock}
+        </div>
+      </div>`;
     }).join('');
   } catch(e) {
     $('earnings-container').innerHTML = '<div style="padding:60px 20px; text-align:center; color:var(--red);">실적 데이터를 불러오지 못했습니다.</div>';
@@ -1083,15 +1148,22 @@ function renderDonut() {
 }
 
 function recordToday() {
-  let stockV = 0; (load(K.holdings)||[]).forEach(h => stockV += (App.px[h.ticker]?.price||h.avgCost)*h.shares); 
+  let stockV = 0; (load(K.holdings)||[]).forEach(h => stockV += (App.px[h.ticker]?.price||h.avgCost)*h.shares);
   let cashV = parseFloat(load(K.cash)||0); let totalV = stockV + cashV;
   if(totalV===0) return toast('⚠️ 먼저 새로고침으로 가격을 조회해주세요');
-  
-  let hist=load(K.history)||[]; 
-  const entry = { date:today(), stockValue: +stockV.toFixed(2), cashValue: +cashV.toFixed(2), totalValue: +totalV.toFixed(2) }; 
-  const idx = hist.findIndex(h=>h.date===today());
-  if(idx>=0) hist[idx]=entry; else hist.push(entry); 
-  save(K.history,hist); toast('✅ 오늘 기록 저장 완료'); render();
+  $('recordDateInput').value = today();
+  $('recordModal').classList.add('show');
+}
+function confirmRecordDate() {
+  const d = $('recordDateInput').value;
+  if(!d) return toast('날짜를 선택해주세요');
+  let stockV = 0; (load(K.holdings)||[]).forEach(h => stockV += (App.px[h.ticker]?.price||h.avgCost)*h.shares);
+  let cashV = parseFloat(load(K.cash)||0);
+  let hist=load(K.history)||[];
+  const entry = { date:d, stockValue: +stockV.toFixed(2), cashValue: +cashV.toFixed(2), totalValue: +(stockV+cashV).toFixed(2) };
+  const idx = hist.findIndex(h=>h.date===d);
+  if(idx>=0) hist[idx]=entry; else hist.push(entry);
+  save(K.history,hist); closeModal('recordModal'); toast('✅ '+d+' 기록 저장 완료'); render();
 }
 
 function renderHistory() {
