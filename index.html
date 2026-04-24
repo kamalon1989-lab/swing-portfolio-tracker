@@ -14,8 +14,7 @@
   --green: #16a34a; --red: #dc2626; --blue: #2563eb;
   --orange: #ea580c; --amber: #d97706;
   --r: 12px; --hover-bg: #fafafa;
-}
-[data-theme="dark"] {
+}[data-theme="dark"] {
   --bg: #111827; --card: #1f2937; --border: #374151;
   --text: #f9fafb; --sub: #9ca3af;
   --green: #22c55e; --red: #ef4444; --blue: #3b82f6;
@@ -79,8 +78,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Got
 .section-note { font-size: 11px; color: var(--sub); }
 
 /* 🚨 Alert Panel */
-.alert-panel { background: #fffbeb; border: 1px solid #fde68a; }
-[data-theme="dark"] .alert-panel { background: #422006; border-color: #78350f; }
+.alert-panel { background: #fffbeb; border: 1px solid #fde68a; }[data-theme="dark"] .alert-panel { background: #422006; border-color: #78350f; }
 .alert-item { padding: 10px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; font-size: 13.5px; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
 .alert-item:last-child { margin-bottom: 0; }
 
@@ -109,8 +107,7 @@ tbody td:first-child { text-align: left; padding-left: 0; }
 .main-row.open { background: var(--hover-bg); }
 .main-row.open .tick-arrow { transform: rotate(180deg); }
 .detail-row td { padding: 0 !important; border: none !important; }
-.detail-wrap { display: flex; gap: 16px; padding: 20px 24px; background: #f8fafc; border-bottom: 1px solid var(--border); box-shadow: inset 0 4px 6px -4px rgba(0,0,0,0.05); height: 380px; }
-[data-theme="dark"] .detail-wrap { background: #0f172a; box-shadow: inset 0 4px 6px -4px rgba(0,0,0,0.3); }
+.detail-wrap { display: flex; gap: 16px; padding: 20px 24px; background: #f8fafc; border-bottom: 1px solid var(--border); box-shadow: inset 0 4px 6px -4px rgba(0,0,0,0.05); height: 380px; }[data-theme="dark"] .detail-wrap { background: #0f172a; box-shadow: inset 0 4px 6px -4px rgba(0,0,0,0.3); }
 .tv-box { flex: 2.2; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); background: var(--card); }
 
 /* News Box Styling */
@@ -120,7 +117,7 @@ tbody td:first-child { text-align: left; padding-left: 0; }
 .news-item .headline { font-size:12.5px; color:var(--text); font-weight:500; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .news-item .meta { font-size:10.5px; color:var(--sub); display:flex; justify-content:space-between; }
 
-/* TP/SL Progress 시인성 개선 */
+/* TP/SL Progress */
 .sl-tp-wrap { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
 .sl-tp-bar { width: 100px; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; position: relative; }
 .sl-tp-fill { height: 100%; border-radius: 4px; transition: width .4s; }
@@ -134,7 +131,6 @@ tbody td:first-child { text-align: left; padding-left: 0; }
 
 /* ── GRIDS ── */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
-.grid-3 { display: grid; grid-template-columns: 1.5fr 0.8fr 1.2fr; gap: 14px; }
 .asset-grid-top { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 14px; }
 .asset-chart-wrap { height: 350px; position: relative; display: flex; align-items: center; justify-content: center; }
 @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .asset-grid-top { grid-template-columns: 1fr; } }
@@ -224,8 +220,8 @@ tbody td:first-child { text-align: left; padding-left: 0; }
       <div class="card" style="border:2px solid var(--blue);"><div class="card-label">총 자산 (주식+현금)</div><div class="card-value c-blue" id="c-totalAsset">-</div><div class="card-sub" id="c-totalAssetKrw" style="font-size:11px;color:var(--sub);">₩-</div></div>
     </div>
 
-    <!-- 🚨 타점 임박 알림판 -->
-    <div id="actionAlertsWrap" class="section alert-panel" style="display:none; margin-bottom:14px;"></div>
+    <!-- 🚨 보유종목 타점 알림판 -->
+    <div id="portfolioAlertsWrap" class="section alert-panel" style="display:none; margin-bottom:14px;"></div>
 
     <!-- 보유 종목 리스트 -->
     <div class="section" style="padding-bottom: 0;">
@@ -236,7 +232,7 @@ tbody td:first-child { text-align: left; padding-left: 0; }
       <div id="portfolioWrap" style="margin: 0 -18px;"></div>
     </div>
     
-    <!-- 💡 실전 트레이딩 위젯 (히트맵, 핫리스트, 실적, 경제력) -->
+    <!-- 💡 실전 트레이딩 위젯 (히트맵, 핫리스트, 실적) -->
     <div class="grid-2">
       <!-- 1. S&P 500 섹터 히트맵 -->
       <div class="section" style="margin-bottom:0; padding-bottom:10px; height:450px;">
@@ -251,19 +247,11 @@ tbody td:first-child { text-align: left; padding-left: 0; }
       </div>
     </div>
 
-    <div class="grid-2" style="margin-top:14px;">
-      <!-- 3. 내 종목 실적 발표 캘린더 -->
-      <div class="section" style="margin-bottom:0; height:450px; display:flex; flex-direction:column;">
-        <div class="section-header" style="margin-bottom: 8px;"><span class="section-title">📅 내 종목 실적 발표 (향후 2주)</span></div>
-        <div id="earnings-container" style="flex:1; overflow-y:auto; padding-right:4px;">
-           <div style="text-align:center; padding:60px 20px; color:var(--sub);"><span class="spinner"></span> 실적 데이터를 불러오는 중...</div>
-        </div>
-      </div>
-
-      <!-- 4. 주요 경제 캘린더 -->
-      <div class="section" style="margin-bottom:0; padding-bottom:10px; height:450px;">
-        <div class="section-header" style="margin-bottom: 8px;"><span class="section-title">🌍 주요 경제 캘린더 (거시지표)</span></div>
-        <div class="tradingview-widget-container" id="tv-calendar-container" style="height: calc(100% - 35px); width: 100%;"></div>
+    <!-- 3. 실적 발표 캘린더 -->
+    <div class="section" style="margin-top:14px; margin-bottom:0; height:450px; display:flex; flex-direction:column;">
+      <div class="section-header" style="margin-bottom: 8px;"><span class="section-title">📅 내 종목 실적 발표 (향후 2주)</span></div>
+      <div id="earnings-container" style="flex:1; overflow-y:auto; padding-right:4px;">
+         <div style="text-align:center; padding:60px 20px; color:var(--sub);"><span class="spinner"></span> 실적 데이터를 불러오는 중...</div>
       </div>
     </div>
 
@@ -282,13 +270,18 @@ tbody td:first-child { text-align: left; padding-left: 0; }
       </div>
     </div>
     <div class="section">
-      <div class="section-header"><span class="section-title">📁 히스토리 기록</span><button class="btn btn-sm btn-danger" id="delLastBtn" style="display:none;" onclick="deleteLastRecord()">마지막 삭제</button></div>
+      <div class="section-header">
+        <span class="section-title">📁 히스토리 기록</span>
+      </div>
       <div class="hist-scroll" id="histWrap"></div>
     </div>
   </div>
 
   <!-- TAB 3: WATCHLIST -->
   <div class="tab-content" id="tab-watchlist">
+    <!-- 🚨 관심종목 타점 알림판 -->
+    <div id="watchlistAlertsWrap" class="section alert-panel" style="display:none; margin-bottom:14px;"></div>
+
     <div class="section" style="padding-bottom: 0;">
       <div class="section-header"><span class="section-title">👀 관심 종목</span><button class="btn btn-primary btn-sm" onclick="openAddWatchlist()">＋ 관심 추가</button></div>
       <div id="watchlistWrap" style="margin: 0 -18px;"></div>
@@ -311,13 +304,33 @@ tbody td:first-child { text-align: left; padding-left: 0; }
 </div>
 
 <!-- ══ MODALS ══ -->
+
+<!-- 히스토리 수정 모달 -->
+<div class="modal-overlay" id="histModal">
+  <div class="modal" style="width:360px;">
+    <h2>히스토리 수정</h2>
+    <div class="form-group"><label>날짜</label><input id="hist-date" type="date" disabled></div>
+    <div class="form-group"><label>주식 평가액 (USD)</label><input id="hist-stock" type="number" step="0.01" min="0"></div>
+    <div class="form-group"><label>예수금 (USD)</label><input id="hist-cash" type="number" step="0.01" min="0"></div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal('histModal')">취소</button>
+      <button class="btn btn-primary" onclick="saveHistory()">저장</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="apiModal">
-  <div class="modal" style="width:400px;">
+  <div class="modal" style="width:420px;">
     <h2>🔑 API 키 설정</h2>
+    <div style="background:#eff6ff; border:1px solid #bfdbfe; padding:12px; border-radius:8px; margin-bottom:14px; font-size:12px; color:#1e3a8a; line-height:1.5;">
+      <strong>📌 Finnhub API 발급 가이드</strong><br>
+      1. <a href="https://finnhub.io" target="_blank" style="color:var(--blue); font-weight:bold;">finnhub.io</a> 접속 후 무료 회원가입<br>
+      2. 로그인 후 대시보드(Dashboard) 화면으로 이동<br>
+      3. <b>API Key</b> 라고 적힌 영문/숫자 복사 후 아래 입력칸에 붙여넣기
+    </div>
     <div class="form-group">
-      <label>📈 Finnhub API 키 <span class="optional-label">주가·실적·뉴스</span></label>
-      <input id="api-finnhub" type="password" placeholder="무료 발급: finnhub.io">
-      <div class="hint">60 req/min 무료 · 신용카드 불필요</div>
+      <label>📈 Finnhub API 키 <span class="optional-label">필수</span></label>
+      <input id="api-finnhub" type="password" placeholder="여기에 붙여넣기">
     </div>
     <div class="form-actions">
       <button class="btn btn-secondary" onclick="closeModal('apiModal')">취소</button>
@@ -331,6 +344,7 @@ tbody td:first-child { text-align: left; padding-left: 0; }
     <h2 id="holdingModalTitle">종목 추가</h2>
     <div class="form-row"><div class="form-group"><label>종목 코드</label><input id="hm-ticker" style="text-transform:uppercase;" placeholder="예: AAPL"></div><div class="form-group"><label>종목명 <span class="optional-label">선택</span></label><input id="hm-name" placeholder="예: Apple Inc."></div></div>
     <div class="form-row"><div class="form-group"><label>수량 (주)</label><input id="hm-shares" type="number" step="1" min="0"></div><div class="form-group"><label>평균 매수가 (USD)</label><input id="hm-avgcost" type="number" step="0.01" min="0"></div></div>
+    <!-- 💡 % 연동 UI 적용 -->
     <div class="form-row">
       <div class="form-group">
         <label>🎯 목표가 (USD)</label>
@@ -347,6 +361,7 @@ tbody td:first-child { text-align: left; padding-left: 0; }
         </div>
       </div>
     </div>
+    <div class="form-group"><label>📝 메모 <span class="optional-label">선택</span></label><textarea id="hm-note" rows="2" placeholder="투자 아이디어, 매수 근거 등..."></textarea></div>
     <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal('holdingModal')">취소</button><button class="btn btn-primary" onclick="saveHolding()">저장</button></div>
   </div>
 </div>
@@ -375,7 +390,28 @@ tbody td:first-child { text-align: left; padding-left: 0; }
   </div>
 </div>
 
-<div class="modal-overlay" id="cloudModal"><div class="modal" style="width:420px;"><h2>☁️ Firebase 연동</h2><div class="form-group"><label>Firebase Realtime Database URL</label><input id="fb-url-input" type="text" placeholder="https://xxx-default-rtdb.firebaseio.com"><div class="hint">Firebase 콘솔 → Realtime Database에서 URL 복사</div></div><div class="form-actions"><button class="btn btn-danger" onclick="saveFbUrl('');closeModal('cloudModal');toast('Firebase 연결 해제됨');">연결 해제</button><button class="btn btn-secondary" onclick="closeModal('cloudModal')">취소</button><button class="btn btn-primary" onclick="saveCloudUrl()">연결</button></div></div></div>
+<div class="modal-overlay" id="cloudModal">
+  <div class="modal" style="width:460px;">
+    <h2>☁️ Firebase 연동 설정</h2>
+    <div style="background:#f0fdf4; border:1px solid #bbf7d0; padding:12px; border-radius:8px; margin-bottom:14px; font-size:12px; color:#14532d; line-height:1.5;">
+      <strong>📌 Firebase Database 연동 가이드</strong><br>
+      1. <a href="https://console.firebase.google.com/" target="_blank" style="color:var(--blue); font-weight:bold;">Firebase 콘솔</a> 접속 후 새 프로젝트 만들기<br>
+      2. 왼쪽 메뉴: <b>빌드(Build) → Realtime Database</b> → 데이터베이스 만들기<br>
+      3. <b>테스트 모드에서 시작</b> 선택 후 사용 설정<br>
+      4. 상단 <b>규칙(Rules)</b> 탭에서 <code>.read</code>와 <code>.write</code>를 <b>true</b>로 변경 후 게시<br>
+      5. <b>데이터</b> 탭에 있는 링크(https://...) 복사 후 아래 입력칸에 붙여넣기
+    </div>
+    <div class="form-group">
+      <label>Firebase Realtime Database URL</label>
+      <input id="fb-url-input" type="text" placeholder="https://xxx-default-rtdb.firebaseio.com">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-danger" onclick="saveFbUrl('');closeModal('cloudModal');toast('Firebase 연결 해제됨');">연결 해제</button>
+      <button class="btn btn-secondary" onclick="closeModal('cloudModal')">취소</button>
+      <button class="btn btn-primary" onclick="saveCloudUrl()">연결</button>
+    </div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 <input type="file" id="importFile" accept=".json" style="display:none;" onchange="handleImport(event)">
@@ -403,7 +439,7 @@ function toast(msg, ms = 2500) { const el=$('toast'); el.textContent=msg; el.cla
 function parseOpenRow(key) { const idx = key.indexOf('-'); return { type: key.slice(0, idx), ticker: key.slice(idx + 1) }; }
 
 // ─────────────────────────────────────────────
-//  SETTINGS & THEME
+//  SETTINGS & THEME & TV WIDGETS
 // ─────────────────────────────────────────────
 function toggleSettings(e) { e && e.stopPropagation(); $('settingsMenu').classList.toggle('open'); }
 function closeSettings() { $('settingsMenu').classList.remove('open'); }
@@ -419,9 +455,6 @@ function toggleTheme() {
 }
 initTheme();
 
-// ─────────────────────────────────────────────
-//  TRADINGVIEW WIDGETS (Heatmap, Hotlists, Calendar)
-// ─────────────────────────────────────────────
 function initTvWidgets() {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   const themeStr = isDark ? "dark" : "light";
@@ -433,9 +466,7 @@ function initTvWidgets() {
     const htScript = document.createElement('script');
     htScript.src = 'https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js';
     htScript.async = true;
-    htScript.innerHTML = JSON.stringify({
-      "exchanges":[], "dataSource": "SPX500", "grouping": "sector", "blockSize": "market_cap_basic", "blockColor": "change", "locale": "kr", "symbolUrl": "", "colorTheme": themeStr, "hasTopBar": false, "isTransparent": true, "width": "100%", "height": "100%"
-    });
+    htScript.innerHTML = JSON.stringify({ "exchanges":[], "dataSource": "SPX500", "grouping": "sector", "blockSize": "market_cap_basic", "blockColor": "change", "locale": "kr", "symbolUrl": "", "colorTheme": themeStr, "hasTopBar": false, "isTransparent": true, "width": "100%", "height": "100%" });
     htContainer.appendChild(htScript);
   }
 
@@ -446,23 +477,8 @@ function initTvWidgets() {
     const hotScript = document.createElement('script');
     hotScript.src = 'https://s3.tradingview.com/external-embedding/embed-widget-hotlists.js';
     hotScript.async = true;
-    hotScript.innerHTML = JSON.stringify({
-      "colorTheme": themeStr, "dateRange": "12M", "exchange": "US", "showChart": true, "locale": "kr", "largeChartUrl": "", "isTransparent": true, "showSymbolLogo": true, "showFloatingTooltip": false, "width": "100%", "height": "100%"
-    });
+    hotScript.innerHTML = JSON.stringify({ "colorTheme": themeStr, "dateRange": "12M", "exchange": "US", "showChart": true, "locale": "kr", "largeChartUrl": "", "isTransparent": true, "showSymbolLogo": true, "showFloatingTooltip": false, "width": "100%", "height": "100%" });
     hotContainer.appendChild(hotScript);
-  }
-
-  // 3. Econ Calendar
-  const calContainer = $('tv-calendar-container');
-  if (calContainer) {
-    calContainer.innerHTML = ''; 
-    const calScript = document.createElement('script');
-    calScript.src = 'https://s3.tradingview.com/external-embedding/embed-widget-events.js';
-    calScript.async = true;
-    calScript.innerHTML = JSON.stringify({
-      "colorTheme": themeStr, "isTransparent": true, "width": "100%", "height": "100%", "locale": "kr", "importanceFilter": "0,1", "currencyFilter": "USD,KRW"
-    });
-    calContainer.appendChild(calScript);
   }
 }
 
@@ -525,7 +541,6 @@ async function fetchEarnings() {
     const data = await res.json();
     const allEarnings = data.earningsCalendar || [];
     
-    // Filter for my tickers only
     const myTickers = [...new Set([...(load(K.holdings)||[]).map(x=>x.ticker), ...(load(K.watch)||[]).map(x=>x.ticker)])];
     const myEarnings = allEarnings.filter(e => myTickers.includes(e.symbol));
     
@@ -553,7 +568,7 @@ async function fetchEarnings() {
 }
 
 async function refreshPrices() {
-  const allTickers = [...new Set([...(load(K.holdings)||[]).map(x=>x.ticker), ...(load(K.watch)||[]).map(x=>x.ticker)])];
+  const allTickers =[...new Set([...(load(K.holdings)||[]).map(x=>x.ticker), ...(load(K.watch)||[]).map(x=>x.ticker)])];
   if (!allTickers.length) return;
   const apiKey = localStorage.getItem(K.key); if (!apiKey) return openApiKeyModal();
 
@@ -585,7 +600,7 @@ async function refreshPrices() {
     $('priceUpdatedAt').textContent = `${timeStr} 기준`;
     
     render();
-    fetchEarnings(); // 가격 갱신 후 실적 발표도 갱신
+    fetchEarnings(); 
   } catch(e) { setStatus('fail','조회 실패'); }
   $('refreshBtn').classList.remove('spinning');
 }
@@ -594,40 +609,44 @@ function setStatus(c, t) { $('statusDot').className='dot '+c; $('statusText').te
 function toggleKRW() { App.krw=!App.krw; save(K.krw,App.krw); $('krwToggle').classList.toggle('on',App.krw); render(); }
 
 // ─────────────────────────────────────────────
-//  🚨 ACTIONABLE ALERTS (타점 임박 알림판)
+//  🚨 ACTIONABLE ALERTS (타점 임박 알림 분리)
 // ─────────────────────────────────────────────
 function renderAlerts() {
   const h = load(K.holdings)||[]; const w = load(K.watch)||[];
-  let alerts =[];
+  let pAlerts = []; let wAlerts =[];
 
   h.forEach(x => {
     const px = App.px[x.ticker]?.price; if(!px) return;
     if(x.targetPrice) {
       const diff = (px - x.targetPrice) / x.targetPrice * 100;
-      if(diff >= -3 && diff <= 0) alerts.push(`<div class="alert-item">🎯 <strong>${x.ticker}</strong> 목표가(${fmtUSD(x.targetPrice)}) 도달 임박! <span class="c-gray" style="font-size:12px;margin-left:auto;">(현재 ${fmtUSD(px)}, ${Math.abs(diff).toFixed(1)}% 남음)</span></div>`);
-      else if(diff > 0) alerts.push(`<div class="alert-item" style="border-left:4px solid var(--green);">✅ <strong>${x.ticker}</strong> 목표가 돌파! <span class="c-gray" style="font-size:12px;margin-left:auto;">(현재 ${fmtUSD(px)})</span></div>`);
+      if(diff >= -3 && diff <= 0) pAlerts.push(`<div class="alert-item">🎯 <strong>${x.ticker}</strong> 목표가(${fmtUSD(x.targetPrice)}) 도달 임박! <span class="c-gray" style="font-size:12px;margin-left:auto;">(현재 ${fmtUSD(px)}, ${Math.abs(diff).toFixed(1)}% 남음)</span></div>`);
+      else if(diff > 0) pAlerts.push(`<div class="alert-item" style="border-left:4px solid var(--green);">✅ <strong>${x.ticker}</strong> 목표가 돌파! <span class="c-gray" style="font-size:12px;margin-left:auto;">(현재 ${fmtUSD(px)})</span></div>`);
     }
     if(x.stopLoss) {
       const diff = (px - x.stopLoss) / x.stopLoss * 100;
-      if(diff >= 0 && diff <= 3) alerts.push(`<div class="alert-item">⚠️ <strong>${x.ticker}</strong> 손절가(${fmtUSD(x.stopLoss)}) 근접! <span class="c-gray" style="font-size:12px;margin-left:auto;">(현재 ${fmtUSD(px)}, ${Math.abs(diff).toFixed(1)}% 남음)</span></div>`);
-      else if(diff < 0) alerts.push(`<div class="alert-item" style="border-left:4px solid var(--red);">🚨 <strong>${x.ticker}</strong> 손절가 이탈! <span class="c-gray" style="font-size:12px;margin-left:auto;">(현재 ${fmtUSD(px)})</span></div>`);
+      if(diff >= 0 && diff <= 3) pAlerts.push(`<div class="alert-item">⚠️ <strong>${x.ticker}</strong> 손절가(${fmtUSD(x.stopLoss)}) 근접! <span class="c-gray" style="font-size:12px;margin-left:auto;">(현재 ${fmtUSD(px)}, ${Math.abs(diff).toFixed(1)}% 남음)</span></div>`);
+      else if(diff < 0) pAlerts.push(`<div class="alert-item" style="border-left:4px solid var(--red);">🚨 <strong>${x.ticker}</strong> 손절가 이탈! <span class="c-gray" style="font-size:12px;margin-left:auto;">(현재 ${fmtUSD(px)})</span></div>`);
     }
   });
 
   w.forEach(x => {
     const px = App.px[x.ticker]?.price; if(!px || !x.targetBuy) return;
     const diff = (px - x.targetBuy) / x.targetBuy * 100;
-    if(diff >= 0 && diff <= 3) alerts.push(`<div class="alert-item">👀 <strong>${x.ticker}</strong> 매수 타점(${fmtUSD(x.targetBuy)}) 근접! <span class="c-gray" style="font-size:12px;margin-left:auto;">(현재 ${fmtUSD(px)}, ${Math.abs(diff).toFixed(1)}% 남음)</span></div>`);
-    else if(diff < 0) alerts.push(`<div class="alert-item" style="border-left:4px solid var(--blue);">🟢 <strong>${x.ticker}</strong> 매수 타점 진입! <span class="c-gray" style="font-size:12px;margin-left:auto;">(현재 ${fmtUSD(px)})</span></div>`);
+    if(diff >= 0 && diff <= 3) wAlerts.push(`<div class="alert-item">👀 <strong>${x.ticker}</strong> 매수 타점(${fmtUSD(x.targetBuy)}) 근접! <span class="c-gray" style="font-size:12px;margin-left:auto;">(현재 ${fmtUSD(px)}, ${Math.abs(diff).toFixed(1)}% 남음)</span></div>`);
+    else if(diff < 0) wAlerts.push(`<div class="alert-item" style="border-left:4px solid var(--blue);">🟢 <strong>${x.ticker}</strong> 매수 타점 진입! <span class="c-gray" style="font-size:12px;margin-left:auto;">(현재 ${fmtUSD(px)})</span></div>`);
   });
 
-  const wrap = $('actionAlertsWrap');
-  if(alerts.length > 0) {
-    wrap.style.display = 'block';
-    wrap.innerHTML = `<div class="section-header" style="margin-bottom:8px;"><span class="section-title">🚨 타점 임박 알림</span></div>` + alerts.join('');
-  } else {
-    wrap.style.display = 'none';
-  }
+  const pWrap = $('portfolioAlertsWrap');
+  if(pAlerts.length > 0) {
+    pWrap.style.display = 'block';
+    pWrap.innerHTML = `<div class="section-header" style="margin-bottom:8px;"><span class="section-title">🚨 보유종목 타점 알림</span></div>` + pAlerts.join('');
+  } else { pWrap.style.display = 'none'; }
+
+  const wWrap = $('watchlistAlertsWrap');
+  if(wAlerts.length > 0) {
+    wWrap.style.display = 'block';
+    wWrap.innerHTML = `<div class="section-header" style="margin-bottom:8px;"><span class="section-title">🚨 관심종목 타점 알림</span></div>` + wAlerts.join('');
+  } else { wWrap.style.display = 'none'; }
 }
 
 // ─────────────────────────────────────────────
@@ -672,7 +691,6 @@ async function toggleRow(type, ticker) {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   new TradingView.widget({ autosize:true, symbol:ticker, interval:'D', timezone:'Asia/Seoul', theme:isDark?'dark':'light', style:'1', locale:'kr', enable_publishing:false, backgroundColor:isDark?'#1f2937':'#ffffff', gridColor:isDark?'#374151':'#e5e7eb', hide_top_toolbar:false, hide_legend:false, save_image:false, container_id:`tv-box-${type}-${ticker}` });
 
-  // 뉴스 리스트 렌더링
   fetchFinnhubNewsRaw(ticker).then(newsList => {
     const listEl = $(`news-list-${type}-${ticker}`);
     if(!newsList || newsList.length === 0) { listEl.innerHTML = '<div style="font-size:12px;color:var(--sub);text-align:center;margin-top:20px;">최근 7일 내 뉴스가 없습니다.</div>'; return; }
@@ -687,7 +705,7 @@ async function toggleRow(type, ticker) {
 }
 
 // ─────────────────────────────────────────────
-//  RENDER
+//  RENDER (Table & Charts)
 // ─────────────────────────────────────────────
 function setSort(key) { if(App.sort===key) App.asc=!App.asc; else { App.sort=key; App.asc=(key==='ticker'||key==='name'); } renderTable(); }
 function sortIcon(key) { return App.sort===key ? (App.asc?' ▴':' ▾') : ''; }
@@ -724,6 +742,7 @@ function renderTable() {
       <th class="sortable" onclick="setSort('pnlPct')">수익률${sortIcon('pnlPct')}</th>
       <th class="sortable" onclick="setSort('dayChgPct')">오늘${sortIcon('dayChgPct')}</th>
       <th>목표/손절</th>
+      <th style="text-align:left;">메모</th>
       <th style="padding-right:24px;">비중</th>
     </tr></thead>
     <tbody>${rows.map(r=>{
@@ -745,10 +764,11 @@ function renderTable() {
         <td class="${cls(r.pnlPct)}">${r.price?fmtPct(r.pnlPct):'—'}</td>
         <td class="${cls(r.dayChgPct)}">${r.price?fmtPct(r.dayChgPct):'—'}</td>
         <td>${tpSlHtml}</td>
+        <td style="text-align:left;font-size:11.5px;color:var(--sub);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${r.note||''}">${r.note||'—'}</td>
         <td style="padding-right:24px;"><div class="w-wrap"><span class="c-gray" style="font-size:11px;">${r.weight.toFixed(1)}%</span><div class="w-bar"><div class="w-fill" style="width:${(r.weight/maxW*100).toFixed(0)}%"></div></div></div></td>
       </tr>
       <tr id="detail-holding-${r.ticker}" class="detail-row" style="display:${isOpen?'table-row':'none'};">
-        <td colspan="10"><div class="detail-wrap" id="wrap-holding-${r.ticker}"></div></td>
+        <td colspan="11"><div class="detail-wrap" id="wrap-holding-${r.ticker}"></div></td>
       </tr>`;
     }).join('')}</tbody></table>`;
 
@@ -837,11 +857,11 @@ function recordToday() {
 }
 
 function renderHistory() {
-  const hist=[...(load(K.history)||[])].reverse(); const btn=$('delLastBtn');
-  if(!hist.length){$('histWrap').innerHTML='<div style="text-align:center;padding:20px;color:var(--sub);font-size:12px;">아직 기록이 없습니다</div>';btn.style.display='none';return;}
-  btn.style.display='inline-block'; const firstVal=hist[hist.length-1]?.totalValue||0;
+  const hist=[...(load(K.history)||[])].reverse();
+  if(!hist.length){$('histWrap').innerHTML='<div style="text-align:center;padding:20px;color:var(--sub);font-size:12px;">아직 기록이 없습니다</div>';return;}
+  const firstVal=hist[hist.length-1]?.totalValue||0;
   $('histWrap').innerHTML=`<table>
-    <thead><tr><th style="text-align:left;">날짜</th><th>총 자산</th><th>주식 평가액</th><th>예수금</th><th>전일비</th><th>누적</th></tr></thead>
+    <thead><tr><th style="text-align:left;">날짜</th><th>총 자산</th><th>주식 평가액</th><th>예수금</th><th>전일비</th><th>누적</th><th>관리</th></tr></thead>
     <tbody>${hist.map((h,i)=>{
       const prev=hist[i+1]?.totalValue??h.totalValue; const delta=h.totalValue-prev; const cpct=firstVal>0?((h.totalValue-firstVal)/firstVal*100):0;
       const sv = h.stockValue ?? h.totalValue; const cv = h.cashValue ?? 0;
@@ -852,27 +872,49 @@ function renderHistory() {
         <td class="c-gray">${fmtUSD(cv)}</td>
         <td class="${i<hist.length-1?cls(delta):'c-gray'}">${i<hist.length-1?(delta>=0?'+':'')+fmtUSD(delta):'—'}</td>
         <td class="${cls(cpct)}">${fmtPct(cpct)}</td>
+        <td>
+          <button class="btn btn-sm btn-secondary" onclick="openEditHistory('${h.date}')">수정</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteHistory('${h.date}')">삭제</button>
+        </td>
       </tr>`;
     }).join('')}</tbody></table>`;
 }
-function deleteLastRecord(){const hist=load(K.history)||[];if(!hist.length)return;if(!confirm(`${hist[hist.length-1].date} 기록을 삭제할까요?`))return;hist.pop();save(K.history,hist);toast('🗑️ 삭제 완료');render();}
+
+function openEditHistory(date) {
+  const hist = load(K.history)||[]; const item = hist.find(h => h.date === date); if(!item) return;
+  $('hist-date').value = item.date;
+  $('hist-stock').value = item.stockValue ?? item.totalValue;
+  $('hist-cash').value = item.cashValue ?? 0;
+  $('histModal').classList.add('show');
+}
+function saveHistory() {
+  const d = $('hist-date').value; const sv = parseFloat($('hist-stock').value) || 0; const cv = parseFloat($('hist-cash').value) || 0;
+  let hist = load(K.history)||[]; const idx = hist.findIndex(h => h.date === d);
+  if(idx >= 0) { hist[idx] = { date: d, stockValue: sv, cashValue: cv, totalValue: sv + cv }; save(K.history, hist); closeModal('histModal'); renderHistory(); renderChart(); toast('✅ 기록 수정 완료'); }
+}
+function deleteHistory(date){
+  if(!confirm(`${date} 기록을 삭제할까요?`)) return;
+  let hist = load(K.history)||[]; hist = hist.filter(h => h.date !== date);
+  save(K.history, hist); renderHistory(); renderChart(); toast('🗑️ 삭제 완료');
+}
 
 // ─────────────────────────────────────────────
 //  HOLDING CRUD
 // ─────────────────────────────────────────────
-function openAddHolding(){App.editH=null;$('holdingModalTitle').textContent='종목 추가';['hm-ticker','hm-name','hm-shares','hm-avgcost','hm-target','hm-stoploss','hm-target-pct','hm-stoploss-pct'].forEach(id=>$(id).value='');$('hm-ticker').disabled=false;$('holdingModal').classList.add('show');}
+function openAddHolding(){App.editH=null;$('holdingModalTitle').textContent='종목 추가';['hm-ticker','hm-name','hm-shares','hm-avgcost','hm-target','hm-stoploss','hm-target-pct','hm-stoploss-pct','hm-note'].forEach(id=>$(id).value='');$('hm-ticker').disabled=false;$('holdingModal').classList.add('show');}
 function openEditHolding(t){
   const h=(load(K.holdings)||[]).find(x=>x.ticker===t);if(!h)return;App.editH=t;$('holdingModalTitle').textContent='종목 수정';
-  $('hm-ticker').value=h.ticker;$('hm-name').value=h.name||'';$('hm-shares').value=h.shares;$('hm-avgcost').value=h.avgCost;$('hm-target').value=h.targetPrice||'';$('hm-stoploss').value=h.stopLoss||'';
+  $('hm-ticker').value=h.ticker;$('hm-name').value=h.name||'';$('hm-shares').value=h.shares;$('hm-avgcost').value=h.avgCost;$('hm-target').value=h.targetPrice||'';$('hm-stoploss').value=h.stopLoss||'';$('hm-note').value=h.note||'';
   $('hm-ticker').disabled=true;$('holdingModal').classList.add('show');
-  setTimeout(()=>$('hm-avgcost').dispatchEvent(new Event('input')), 50); // % 자동계산 트리거
+  setTimeout(()=>$('hm-avgcost').dispatchEvent(new Event('input')), 50);
 }
 function saveHolding(){
   const t=$('hm-ticker').value.toUpperCase().trim(),shares=parseFloat($('hm-shares').value),avg=parseFloat($('hm-avgcost').value);if(!t||!shares||!avg)return toast('종목코드, 수량, 평단가는 필수입니다');
-  let h=load(K.holdings)||[];const entry={ticker:t,name:$('hm-name').value.trim(),shares,avgCost:avg,targetPrice:parseFloat($('hm-target').value)||0,stopLoss:parseFloat($('hm-stoploss').value)||0};
+  let h=load(K.holdings)||[];const entry={ticker:t,name:$('hm-name').value.trim(),shares,avgCost:avg,targetPrice:parseFloat($('hm-target').value)||0,stopLoss:parseFloat($('hm-stoploss').value)||0,note:$('hm-note').value.trim()};
   if(App.editH) h[h.findIndex(x=>x.ticker===App.editH)]={...h[h.findIndex(x=>x.ticker===App.editH)],...entry};else{if(h.find(x=>x.ticker===t))return toast('이미 보유 종목에 있습니다');h.push(entry);}
   save(K.holdings,h);closeModal('holdingModal');render();refreshPrices();
 }
+function deleteHoldingTicker(t){if(confirm(`${t} 삭제할까요?`)){save(K.holdings,(load(K.holdings)||[]).filter(x=>x.ticker!==t));App.openRow=null;render();}}
 function focusCashInput(){$('cm-cash').value=parseFloat(load(K.cash)||0);$('cashModal').classList.add('show');}
 function saveCash(){save(K.cash,parseFloat($('cm-cash').value)||0);closeModal('cashModal');render();}
 
@@ -918,7 +960,7 @@ function renderJournal(){
 }
 
 // ─────────────────────────────────────────────
-//  MISC
+//  MISC & FIREBASE
 // ─────────────────────────────────────────────
 function switchTab(n){
   document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
