@@ -220,7 +220,7 @@ tbody td:first-child { text-align: left; padding-left: 0; }
 .notif-dot  { position:absolute; top:-3px; right:-3px; width:8px; height:8px; background:var(--red); border-radius:50%; border:1.5px solid var(--card); pointer-events:none; }
 
 /* ── SHARE VIEW (read-only 공유 페이지) ── */
-.share-overlay { position:fixed; inset:0; background:var(--bg); z-index:9999; overflow-y:auto; padding:40px 16px 100px; display:none; }
+.share-overlay { position:fixed; inset:0; background:var(--bg); z-index:10001; overflow-y:auto; padding:40px 16px 100px; display:none; }
 .share-header  { text-align:center; margin-bottom:24px; }
 .share-title   { font-size:22px; font-weight:800; color:var(--text); }
 .share-sub     { font-size:12px; color:var(--sub); margin-top:6px; }
@@ -585,8 +585,26 @@ tbody td:first-child { text-align: left; padding-left: 0; }
     </div>
     <div class="form-group"><label>📝 메모 <span class="optional-label">선택</span></label><textarea id="hm-note" rows="2" placeholder="투자 아이디어, 매수 근거 등..."></textarea></div>
     <div class="form-row">
-      <div class="form-group"><label>📅 최초 매수일 <span class="optional-label">선택</span></label><input type="date" id="hm-buydate" class="form-input"></div>
-      <div class="form-group"><label>📅 최근 추매일 <span class="optional-label">선택</span></label><input type="date" id="hm-lastbuydate" class="form-input"></div>
+      <div class="form-group">
+        <label>📅 최초 매수일 <span class="optional-label">선택</span></label>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <input type="number" id="hm-by" placeholder="YYYY" min="2000" max="2099" class="form-input" style="width:70px;padding:7px 6px;" oninput="if(this.value.length>=4)document.getElementById('hm-bm').focus()">
+          <span style="color:var(--sub);flex-shrink:0;">-</span>
+          <input type="number" id="hm-bm" placeholder="MM" min="1" max="12" class="form-input" style="width:52px;padding:7px 6px;" oninput="if(this.value.length>=2)document.getElementById('hm-bd').focus()">
+          <span style="color:var(--sub);flex-shrink:0;">-</span>
+          <input type="number" id="hm-bd" placeholder="DD" min="1" max="31" class="form-input" style="width:52px;padding:7px 6px;">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>📅 최근 추매일 <span class="optional-label">선택</span></label>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <input type="number" id="hm-lby" placeholder="YYYY" min="2000" max="2099" class="form-input" style="width:70px;padding:7px 6px;" oninput="if(this.value.length>=4)document.getElementById('hm-lbm').focus()">
+          <span style="color:var(--sub);flex-shrink:0;">-</span>
+          <input type="number" id="hm-lbm" placeholder="MM" min="1" max="12" class="form-input" style="width:52px;padding:7px 6px;" oninput="if(this.value.length>=2)document.getElementById('hm-lbd').focus()">
+          <span style="color:var(--sub);flex-shrink:0;">-</span>
+          <input type="number" id="hm-lbd" placeholder="DD" min="1" max="31" class="form-input" style="width:52px;padding:7px 6px;">
+        </div>
+      </div>
     </div>
     <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal('holdingModal')">취소</button><button class="btn btn-primary" onclick="saveHolding()">저장</button></div>
   </div>
@@ -724,7 +742,20 @@ function openChangelog() {
 // ─────────────────────────────────────────────
 //  HOLDING AGE BADGE
 // ─────────────────────────────────────────────
-function ageBadge(buyDate, lastBuyDate) {
+// 날짜 3분할 입출력 헬퍼
+function buildDateStr(yId, mId, dId) {
+  const y=$(`${yId}`).value, m=$(`${mId}`).value, d=$(`${dId}`).value;
+  if(!y||!m||!d) return null;
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+function setDateFields(yId, mId, dId, dateStr) {
+  if(!dateStr){ $(`${yId}`).value=''; $(`${mId}`).value=''; $(`${dId}`).value=''; return; }
+  const [y,m,d] = dateStr.split('-');
+  $(`${yId}`).value=y||''; $(`${mId}`).value=parseInt(m)||''; $(`${dId}`).value=parseInt(d)||'';
+}
+function clearDateFields(yId, mId, dId) { setDateFields(yId,mId,dId,null); }
+
+function ageBadge(buyDate) {
   if (!buyDate) return '';
   const days = Math.floor((new Date() - new Date(buyDate + 'T00:00:00')) / 864e5);
   if (days < 0) return '';
@@ -749,7 +780,8 @@ function openShareModal() {
   rows.forEach(r => { r.w = totalVal ? +(r.curVal / totalVal * 100).toFixed(1) : 0; delete r.curVal; r.pnl = +r.pnl.toFixed(2); });
   const totalPnlPct = totalCost ? +(((totalVal - totalCost) / totalCost) * 100).toFixed(2) : 0;
   const payload = { rows, pnl: totalPnlPct, date: today() };
-  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  // URL-safe base64 (+ → -, / → _, = 제거) - 모바일 공유 앱에서 깨지지 않도록
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
   const url = `${location.origin}${location.pathname}#share=${encoded}`;
   $('shareUrlInput').value = url;
   $('shareCopyMsg').style.display = 'none';
@@ -763,7 +795,9 @@ function copyShareLink() {
 }
 function showShareView(hash) {
   try {
-    const data = JSON.parse(decodeURIComponent(escape(atob(hash))));
+    // URL-safe base64 복원 (- → +, _ → /, 패딩 추가)
+    const padded = hash.replace(/-/g,'+').replace(/_/g,'/') + '==='.slice(0,(4-hash.length%4)%4);
+    const data = JSON.parse(decodeURIComponent(escape(atob(padded))));
     const sv = $('shareView');
     const isDark = window.matchMedia('(prefers-color-scheme:dark)').matches;
     if (isDark) document.documentElement.setAttribute('data-theme','dark');
@@ -807,6 +841,8 @@ function showShareView(hash) {
 
 let _lastUid = null;
 fbAuth.onAuthStateChanged(user => {
+  // 공유 링크로 접근한 경우 로그인 화면 무시
+  if (location.hash.startsWith('#share=')) return;
   currentUser = user;
   if (user) {
     if (_lastUid && _lastUid !== user.uid) clearLocalData();
@@ -1258,6 +1294,7 @@ function renderTable() {
             <div class="m-row1-left">
               <div class="m-ticker">${r.ticker} <span class="m-tick-arrow">▼</span>${ageBadge(r.buyDate)}</div>
               <div class="m-name">${r.name||''}</div>
+              ${r.price?`<div style="font-size:12px;margin-top:2px;"><span style="color:var(--sub);">현재가</span> <strong style="color:var(--text);">${fmtUSD(r.price)}</strong></div>`:''}
             </div>
             <div class="m-row1-right">
               <div class="m-pnl-amt ${cls(r.pnl)}">${r.price?(r.pnl>=0?'+':'')+fmtAmt(r.pnl):'—'}</div>
@@ -1489,14 +1526,16 @@ function deleteHistory(date){
 function openAddHolding(){
   App.editH=null;$('holdingModalTitle').textContent='종목 추가';
   ['hm-ticker','hm-name','hm-shares','hm-avgcost','hm-target','hm-stoploss','hm-target-pct','hm-stoploss-pct','hm-note'].forEach(id=>$(id).value='');
-  $('hm-buydate').value=today(); $('hm-lastbuydate').value='';
+  setDateFields('hm-by','hm-bm','hm-bd', today());
+  clearDateFields('hm-lby','hm-lbm','hm-lbd');
   $('hm-ticker').disabled=false; $('holdingModal').classList.add('show');
 }
 function openEditHolding(t){
   const h=(load(K.holdings)||[]).find(x=>x.ticker===t);if(!h)return;App.editH=t;$('holdingModalTitle').textContent='종목 수정';
   $('hm-ticker').value=h.ticker;$('hm-name').value=h.name||'';$('hm-shares').value=h.shares;$('hm-avgcost').value=h.avgCost;
   $('hm-target').value=h.targetPrice||'';$('hm-stoploss').value=h.stopLoss||'';$('hm-note').value=h.note||'';
-  $('hm-buydate').value=h.buyDate||''; $('hm-lastbuydate').value=h.lastBuyDate||'';
+  setDateFields('hm-by','hm-bm','hm-bd', h.buyDate||null);
+  setDateFields('hm-lby','hm-lbm','hm-lbd', h.lastBuyDate||null);
   $('hm-ticker').disabled=true;$('holdingModal').classList.add('show');
   setTimeout(()=>$('hm-avgcost').dispatchEvent(new Event('input')), 50);
 }
@@ -1504,15 +1543,17 @@ function saveHolding(){
   const t=$('hm-ticker').value.toUpperCase().trim(),shares=parseFloat($('hm-shares').value),avg=parseFloat($('hm-avgcost').value);
   if(!t||!shares||!avg)return toast('종목코드, 수량, 평단가는 필수입니다');
   let h=load(K.holdings)||[];
+  const buyDate = buildDateStr('hm-by','hm-bm','hm-bd');
+  const lastBuyDate = buildDateStr('hm-lby','hm-lbm','hm-lbd');
   const entry={ticker:t,name:$('hm-name').value.trim(),shares,avgCost:avg,
     targetPrice:parseFloat($('hm-target').value)||0,stopLoss:parseFloat($('hm-stoploss').value)||0,
     note:$('hm-note').value.trim(),
-    buyDate:$('hm-buydate').value||null,
-    lastBuyDate:$('hm-lastbuydate').value||null};
+    buyDate: buyDate||null,
+    lastBuyDate: lastBuyDate||null};
   if(App.editH){
     const idx=h.findIndex(x=>x.ticker===App.editH);
-    // 최초 매수일은 최초 저장값 유지 (비어있으면 현재 입력값 사용)
     const orig=h[idx];
+    // 최초 매수일은 최초 저장값 유지 (비어있으면 현재 입력값 사용)
     h[idx]={...orig,...entry, buyDate: entry.buyDate||(orig.buyDate||null)};
   } else {
     if(h.find(x=>x.ticker===t))return toast('이미 보유 종목에 있습니다');
