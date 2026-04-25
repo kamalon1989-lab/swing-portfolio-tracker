@@ -206,6 +206,38 @@ tbody td:first-child { text-align: left; padding-left: 0; }
 .m-card-detail { display: none; }
 .m-card-detail .detail-wrap { border-radius: 0; }
 
+/* ── HOLDING AGE BADGE ── */
+.age-badge { display:inline-flex; align-items:center; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; margin-left:5px; vertical-align:middle; }
+.age-badge.ok     { background:#dcfce7; color:#16a34a; }
+.age-badge.warn   { background:#fef3c7; color:#d97706; }
+.age-badge.danger { background:#fee2e2; color:#dc2626; }
+[data-theme="dark"] .age-badge.ok     { background:#14532d; color:#86efac; }
+[data-theme="dark"] .age-badge.warn   { background:#78350f; color:#fde68a; }
+[data-theme="dark"] .age-badge.danger { background:#7f1d1d; color:#fca5a5; }
+
+/* ── NOTIFICATION DOT ── */
+.notif-wrap { position:relative; display:inline-flex; }
+.notif-dot  { position:absolute; top:-3px; right:-3px; width:8px; height:8px; background:var(--red); border-radius:50%; border:1.5px solid var(--card); pointer-events:none; }
+
+/* ── SHARE VIEW (read-only 공유 페이지) ── */
+.share-overlay { position:fixed; inset:0; background:var(--bg); z-index:9999; overflow-y:auto; padding:40px 16px 100px; display:none; }
+.share-header  { text-align:center; margin-bottom:24px; }
+.share-title   { font-size:22px; font-weight:800; color:var(--text); }
+.share-sub     { font-size:12px; color:var(--sub); margin-top:6px; }
+.share-summary { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-bottom:22px; }
+.share-stat    { background:var(--card); border-radius:10px; padding:12px 22px; text-align:center; border:1px solid var(--border); min-width:100px; }
+.share-stat-val{ font-size:20px; font-weight:800; }
+.share-stat-lbl{ font-size:11px; color:var(--sub); margin-top:2px; }
+.share-list    { max-width:520px; margin:0 auto; background:var(--card); border-radius:12px; overflow:hidden; border:1px solid var(--border); }
+.share-row     { display:flex; justify-content:space-between; align-items:center; padding:14px 18px; border-bottom:1px solid var(--border); }
+.share-row:last-child { border-bottom:none; }
+.share-ticker  { font-size:15px; font-weight:700; color:var(--blue); }
+.share-name    { font-size:11px; color:var(--sub); margin-top:2px; }
+.share-right   { text-align:right; }
+.share-pnl     { font-size:15px; font-weight:700; }
+.share-weight  { font-size:11px; color:var(--sub); margin-top:2px; }
+.share-footer  { text-align:center; margin-top:24px; color:var(--sub); font-size:12px; line-height:1.8; }
+
 /* ── FAB (Floating Action Button) ── */
 .fab { display: none; position: fixed; right: 18px; bottom: 76px; width: 50px; height: 50px; border-radius: 50%; background: var(--blue); color: #fff; border: none; font-size: 26px; line-height: 1; cursor: pointer; box-shadow: 0 4px 18px rgba(37,99,235,.45); z-index: 98; align-items: center; justify-content: center; transition: transform .15s, box-shadow .15s; }
 .fab:active { transform: scale(0.91); box-shadow: 0 2px 8px rgba(37,99,235,.4); }
@@ -314,6 +346,12 @@ tbody td:first-child { text-align: left; padding-left: 0; }
     <button class="toggle-btn" onclick="toggleTheme()">🌙</button>
     <button class="btn btn-primary btn-sm hide-mobile" onclick="openAddHolding()">＋ 보유 추가</button>
 
+    <!-- 📢 공지사항 -->
+    <div class="notif-wrap">
+      <button class="btn btn-secondary btn-sm" onclick="openChangelog()" title="개발자 노트">📢</button>
+      <span class="notif-dot" id="changelogDot" style="display:none;"></span>
+    </div>
+
     <!-- ⚙️ 설정 드롭다운 -->
     <div class="settings-wrap" id="settingsWrap">
       <button class="btn btn-secondary btn-sm" onclick="toggleSettings(event)">⚙️ 설정</button>
@@ -357,7 +395,11 @@ tbody td:first-child { text-align: left; padding-left: 0; }
     <div class="section" style="padding-bottom: 0;">
       <div class="section-header">
         <div style="display:flex;align-items:center;gap:10px;"><span class="section-title">💼 보유 종목</span><span id="marketStateBadge"></span></div>
-        <div style="display:flex;gap:8px;align-items:center;"><span class="section-note" id="priceUpdatedAt"></span><button class="btn btn-sm btn-success" onclick="recordToday()">📌 오늘 기록 저장</button></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span class="section-note" id="priceUpdatedAt"></span>
+          <button class="btn btn-sm btn-secondary" onclick="openShareModal()">🔗 공유</button>
+          <button class="btn btn-sm btn-success" onclick="recordToday()">📌 오늘 기록 저장</button>
+        </div>
       </div>
       <div id="portfolioWrap" style="margin: 0 -18px;"></div>
     </div>
@@ -445,6 +487,33 @@ tbody td:first-child { text-align: left; padding-left: 0; }
   </div>
 </div>
 
+<!-- ══ 공지사항 모달 ══ -->
+<div class="modal-overlay" id="changelogModal" onclick="if(event.target===this)closeModal('changelogModal')">
+  <div class="modal" style="max-width:500px;">
+    <h2>📢 개발자 노트</h2>
+    <p style="font-size:13px;color:var(--sub);margin-bottom:16px;">여러분들이 요청해 주신 기능들을 반영했습니다. 감사합니다! 🙏</p>
+    <div id="changelogContent" style="max-height:420px;overflow-y:auto;"></div>
+    <div class="form-actions"><button class="btn btn-primary" onclick="closeModal('changelogModal')">확인</button></div>
+  </div>
+</div>
+
+<!-- ══ 공유 모달 ══ -->
+<div class="modal-overlay" id="shareModal" onclick="if(event.target===this)closeModal('shareModal')">
+  <div class="modal" style="max-width:480px;">
+    <h2>🔗 포트폴리오 공유하기</h2>
+    <p style="font-size:13px;color:var(--sub);margin-bottom:16px;line-height:1.6;">금액(평가금, 예수금)은 완전 비공개 처리됩니다.<br>종목명·수익률·비중만 공유됩니다.</p>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="shareUrlInput" class="form-input" readonly style="flex:1;font-size:11px;background:var(--bg);cursor:text;">
+      <button class="btn btn-primary btn-sm" onclick="copyShareLink()">복사</button>
+    </div>
+    <p id="shareCopyMsg" style="font-size:12px;color:var(--green);margin-top:8px;display:none;">✅ 클립보드에 복사됐습니다!</p>
+    <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal('shareModal')">닫기</button></div>
+  </div>
+</div>
+
+<!-- ══ 공유 뷰 (read-only) ══ -->
+<div id="shareView" class="share-overlay"></div>
+
 <!-- ══ FAB ══ -->
 <button class="fab" id="fab" onclick="openAddHolding()">＋</button>
 
@@ -515,6 +584,10 @@ tbody td:first-child { text-align: left; padding-left: 0; }
       </div>
     </div>
     <div class="form-group"><label>📝 메모 <span class="optional-label">선택</span></label><textarea id="hm-note" rows="2" placeholder="투자 아이디어, 매수 근거 등..."></textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label>📅 최초 매수일 <span class="optional-label">선택</span></label><input type="date" id="hm-buydate" class="form-input"></div>
+      <div class="form-group"><label>📅 최근 추매일 <span class="optional-label">선택</span></label><input type="date" id="hm-lastbuydate" class="form-input"></div>
+    </div>
     <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal('holdingModal')">취소</button><button class="btn btn-primary" onclick="saveHolding()">저장</button></div>
   </div>
 </div>
@@ -596,6 +669,141 @@ function signOut() {
 
 const DATA_KEYS = ['ptf_h2','ptf_hist','ptf_px','ptf_cash','ptf_journal','ptf_watch'];
 function clearLocalData() { DATA_KEYS.forEach(k => localStorage.removeItem(k)); }
+
+// ─────────────────────────────────────────────
+//  APP VERSION & CHANGELOG
+// ─────────────────────────────────────────────
+const APP_VERSION = '1.3';
+const RELEASE_NOTES = [
+  { version:'1.3', date:'2025-04-25', title:'보유 D+N · 실적 분리 · 공유 링크',
+    notes:[
+      '📅 보유 종목에 최초 매수일 입력 → 리스트에 D+N 배지 표시 (10일 초과 주황, 15일+ 빨강)',
+      '🔗 포트폴리오 공유 링크 생성 — 금액 비공개, 수익률·비중만 공유',
+      '📢 개발자 노트 기능 추가 (현재 이 창!)',
+      '📅 실적 발표: 보유/관심 탭 분리, 누락 종목 개별 조회로 보완',
+      '📅 오늘 기록 저장 시 날짜 직접 선택 (한국-미국 시차 문제 해결)',
+    ]
+  },
+  { version:'1.2', date:'2025-04-20', title:'API 키 자동 동기화 · 모바일 카드 뷰',
+    notes:[
+      '🔑 다른 기기에서 접속해도 Finnhub API 키 자동 동기화 (Firebase 저장)',
+      '📱 스마트폰에서 표 대신 2줄 카드 리스트로 보유·관심 종목 표시',
+      '📊 실적 발표 카드: D-Day · 장전/장후 · Beat/Miss 표시',
+    ]
+  },
+  { version:'1.1', date:'2025-04-10', title:'구글 계정 로그인',
+    notes:[
+      '🔐 구글 계정으로 로그인 — 여러 명이 각자의 계정으로 사용 가능',
+      '☁️ Firebase Realtime Database로 포트폴리오 자동 클라우드 저장',
+    ]
+  }
+];
+
+function checkVersion() {
+  const seen = localStorage.getItem('ptf_seen_ver');
+  if (seen !== APP_VERSION) $('changelogDot').style.display = 'block';
+}
+function openChangelog() {
+  $('changelogContent').innerHTML = RELEASE_NOTES.map((r,i) => `
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+        <span style="font-size:13px;font-weight:800;background:var(--blue);color:#fff;padding:1px 8px;border-radius:4px;">v${r.version}</span>
+        <span style="font-size:13px;font-weight:700;color:var(--text);">${r.title}</span>
+        <span style="font-size:11px;color:var(--sub);margin-left:auto;">${r.date}</span>
+      </div>
+      <ul style="padding-left:18px;display:flex;flex-direction:column;gap:5px;">
+        ${r.notes.map(n=>`<li style="font-size:13px;color:var(--text);line-height:1.55;">${n}</li>`).join('')}
+      </ul>
+    </div>${i<RELEASE_NOTES.length-1?'<div style="height:1px;background:var(--border);margin:14px 0;"></div>':''}`
+  ).join('');
+  $('changelogModal').classList.add('show');
+  localStorage.setItem('ptf_seen_ver', APP_VERSION);
+  $('changelogDot').style.display = 'none';
+}
+
+// ─────────────────────────────────────────────
+//  HOLDING AGE BADGE
+// ─────────────────────────────────────────────
+function ageBadge(buyDate, lastBuyDate) {
+  if (!buyDate) return '';
+  const days = Math.floor((new Date() - new Date(buyDate + 'T00:00:00')) / 864e5);
+  if (days < 0) return '';
+  const cls = days <= 9 ? 'ok' : days <= 14 ? 'warn' : 'danger';
+  return `<span class="age-badge ${cls}">D+${days}</span>`;
+}
+
+// ─────────────────────────────────────────────
+//  PORTFOLIO SHARE
+// ─────────────────────────────────────────────
+function openShareModal() {
+  const h = load(K.holdings) || [];
+  if (!h.length) return toast('보유 종목이 없습니다');
+  let totalCost = 0, totalVal = 0;
+  const rows = h.map(x => {
+    const px = App.px[x.ticker];
+    const curVal = (px?.price || x.avgCost) * x.shares;
+    const costVal = x.avgCost * x.shares;
+    totalCost += costVal; totalVal += curVal;
+    return { t: x.ticker, n: x.name || '', curVal, pnl: costVal ? (curVal - costVal) / costVal * 100 : 0 };
+  });
+  rows.forEach(r => { r.w = totalVal ? +(r.curVal / totalVal * 100).toFixed(1) : 0; delete r.curVal; r.pnl = +r.pnl.toFixed(2); });
+  const totalPnlPct = totalCost ? +(((totalVal - totalCost) / totalCost) * 100).toFixed(2) : 0;
+  const payload = { rows, pnl: totalPnlPct, date: today() };
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  const url = `${location.origin}${location.pathname}#share=${encoded}`;
+  $('shareUrlInput').value = url;
+  $('shareCopyMsg').style.display = 'none';
+  $('shareModal').classList.add('show');
+}
+function copyShareLink() {
+  const url = $('shareUrlInput').value;
+  navigator.clipboard?.writeText(url).catch(() => { $('shareUrlInput').select(); document.execCommand('copy'); });
+  $('shareCopyMsg').style.display = 'block';
+  setTimeout(() => $('shareCopyMsg').style.display = 'none', 3000);
+}
+function showShareView(hash) {
+  try {
+    const data = JSON.parse(decodeURIComponent(escape(atob(hash))));
+    const sv = $('shareView');
+    const isDark = window.matchMedia('(prefers-color-scheme:dark)').matches;
+    if (isDark) document.documentElement.setAttribute('data-theme','dark');
+    const pnlColor = data.pnl >= 0 ? '#16a34a' : '#dc2626';
+    const sign = n => n >= 0 ? '+' : '';
+    sv.innerHTML = `
+      <div class="share-header">
+        <div class="share-title">📊 포트폴리오 현황</div>
+        <div class="share-sub">${data.date} 기준</div>
+      </div>
+      <div class="share-summary">
+        <div class="share-stat">
+          <div class="share-stat-val" style="color:${pnlColor};">${sign(data.pnl)}${data.pnl.toFixed(2)}%</div>
+          <div class="share-stat-lbl">총 수익률</div>
+        </div>
+        <div class="share-stat">
+          <div class="share-stat-val">${data.rows.length}종목</div>
+          <div class="share-stat-lbl">보유 중</div>
+        </div>
+      </div>
+      <div class="share-list">
+        ${data.rows.map(r => {
+          const c = r.pnl >= 0 ? '#16a34a' : '#dc2626';
+          return `<div class="share-row">
+            <div><div class="share-ticker">${r.t}</div><div class="share-name">${r.n}</div></div>
+            <div class="share-right">
+              <div class="share-pnl" style="color:${c};">${sign(r.pnl)}${r.pnl.toFixed(2)}%</div>
+              <div class="share-weight">비중 ${r.w}%</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="share-footer">
+        <p>💰 금액은 비공개 처리되어 있습니다</p>
+        <p style="margin-top:8px;"><a href="${location.origin}${location.pathname}" style="color:#2563eb;text-decoration:none;font-weight:700;">📊 나도 스윙 포트폴리오 써보기 →</a></p>
+      </div>`;
+    sv.style.display = 'block';
+    $('loginScreen').style.display = 'none';
+  } catch(e) { /* invalid hash, proceed normally */ }
+}
 
 let _lastUid = null;
 fbAuth.onAuthStateChanged(user => {
@@ -961,9 +1169,30 @@ async function toggleRow(type, ticker) {
     ? `<button class="btn btn-sm btn-secondary" onclick="openEditHolding('${ticker}')">✏️ 수정</button><button class="btn btn-sm btn-danger" onclick="deleteHoldingTicker('${ticker}')">🗑️ 삭제</button>`
     : `<button class="btn btn-sm btn-secondary" onclick="openEditWatchlist('${ticker}')">✏️ 수정</button><button class="btn btn-sm btn-danger" onclick="deleteWatchlist('${ticker}')">🗑️ 삭제</button>`;
 
+  // 보유기간 정보 블록 (보유종목일 때만)
+  let holdingDateInfo = '';
+  if (type === 'holding') {
+    const hData = (load(K.holdings)||[]).find(x=>x.ticker===ticker);
+    if (hData?.buyDate) {
+      const days1 = Math.floor((new Date()-new Date(hData.buyDate+'T00:00:00'))/864e5);
+      const lastInfo = hData.lastBuyDate && hData.lastBuyDate !== hData.buyDate
+        ? `<span style="margin-left:14px;">📅 최근 추매일 <strong>${hData.lastBuyDate}</strong></span>`
+        : '';
+      const daysFrom = hData.lastBuyDate && hData.lastBuyDate !== hData.buyDate
+        ? Math.floor((new Date()-new Date(hData.lastBuyDate+'T00:00:00'))/864e5) : days1;
+      const avgDays = hData.lastBuyDate && hData.lastBuyDate !== hData.buyDate
+        ? Math.round((days1 + daysFrom) / 2) : days1;
+      holdingDateInfo = `<div style="padding:8px 14px;background:var(--bg);border-radius:6px;font-size:12px;color:var(--sub);display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+        📅 최초 매수일 <strong style="color:var(--text);margin:0 2px;">${hData.buyDate}</strong> · 보유 <strong style="color:var(--text);">${days1}일째</strong>
+        ${lastInfo}
+      </div>`;
+    }
+  }
+
   wrap.innerHTML = `
     <div class="tv-box" id="tv-box-${type}-${ticker}" style="flex:2;"></div>
     <div class="news-box" style="flex:1.2; display:flex; flex-direction:column; gap:10px;">
+      ${holdingDateInfo}
       <div style="font-weight:600; font-size:13px; color:var(--text); padding-bottom:6px; border-bottom:1px solid var(--border);">📰 ${ticker} 관련 주요 뉴스</div>
       <div id="news-list-${type}-${ticker}" style="display:flex; flex-direction:column; gap:8px; flex:1; overflow-y:auto; padding-right:4px;">
         <div style="text-align:center; padding: 20px;"><span class="spinner"></span></div>
@@ -1027,7 +1256,7 @@ function renderTable() {
         <div id="main-holding-${r.ticker}" class="m-card${isOpen?' open':''}" onclick="toggleRow('holding','${r.ticker}')">
           <div class="m-row1">
             <div class="m-row1-left">
-              <div class="m-ticker">${r.ticker} <span class="m-tick-arrow">▼</span></div>
+              <div class="m-ticker">${r.ticker} <span class="m-tick-arrow">▼</span>${ageBadge(r.buyDate)}</div>
               <div class="m-name">${r.name||''}</div>
             </div>
             <div class="m-row1-right">
@@ -1073,7 +1302,7 @@ function renderTable() {
         const isOpen=App.openRow===`holding-${r.ticker}`;
         return `
         <tr id="main-holding-${r.ticker}" class="main-row${isOpen?' open':''}" onclick="toggleRow('holding','${r.ticker}')">
-          <td style="padding-left:24px;"><div class="tick">${r.ticker} <span class="tick-arrow">▼</span></div><div class="cname">${r.name||''}</div></td>
+          <td style="padding-left:24px;"><div class="tick">${r.ticker} <span class="tick-arrow">▼</span>${ageBadge(r.buyDate)}</div><div class="cname">${r.name||''}</div></td>
           <td><strong>${r.price?fmtUSD(r.price):'<span class="spinner"></span>'}</strong></td>
           <td>${r.shares}</td><td class="c-gray">${fmtUSD(r.avgCost)}</td>
           <td><strong>${r.price?fmtAmt(r.curVal):'—'}</strong></td>
@@ -1257,17 +1486,38 @@ function deleteHistory(date){
 // ─────────────────────────────────────────────
 //  HOLDING CRUD
 // ─────────────────────────────────────────────
-function openAddHolding(){App.editH=null;$('holdingModalTitle').textContent='종목 추가';['hm-ticker','hm-name','hm-shares','hm-avgcost','hm-target','hm-stoploss','hm-target-pct','hm-stoploss-pct','hm-note'].forEach(id=>$(id).value='');$('hm-ticker').disabled=false;$('holdingModal').classList.add('show');}
+function openAddHolding(){
+  App.editH=null;$('holdingModalTitle').textContent='종목 추가';
+  ['hm-ticker','hm-name','hm-shares','hm-avgcost','hm-target','hm-stoploss','hm-target-pct','hm-stoploss-pct','hm-note'].forEach(id=>$(id).value='');
+  $('hm-buydate').value=today(); $('hm-lastbuydate').value='';
+  $('hm-ticker').disabled=false; $('holdingModal').classList.add('show');
+}
 function openEditHolding(t){
   const h=(load(K.holdings)||[]).find(x=>x.ticker===t);if(!h)return;App.editH=t;$('holdingModalTitle').textContent='종목 수정';
-  $('hm-ticker').value=h.ticker;$('hm-name').value=h.name||'';$('hm-shares').value=h.shares;$('hm-avgcost').value=h.avgCost;$('hm-target').value=h.targetPrice||'';$('hm-stoploss').value=h.stopLoss||'';$('hm-note').value=h.note||'';
+  $('hm-ticker').value=h.ticker;$('hm-name').value=h.name||'';$('hm-shares').value=h.shares;$('hm-avgcost').value=h.avgCost;
+  $('hm-target').value=h.targetPrice||'';$('hm-stoploss').value=h.stopLoss||'';$('hm-note').value=h.note||'';
+  $('hm-buydate').value=h.buyDate||''; $('hm-lastbuydate').value=h.lastBuyDate||'';
   $('hm-ticker').disabled=true;$('holdingModal').classList.add('show');
   setTimeout(()=>$('hm-avgcost').dispatchEvent(new Event('input')), 50);
 }
 function saveHolding(){
-  const t=$('hm-ticker').value.toUpperCase().trim(),shares=parseFloat($('hm-shares').value),avg=parseFloat($('hm-avgcost').value);if(!t||!shares||!avg)return toast('종목코드, 수량, 평단가는 필수입니다');
-  let h=load(K.holdings)||[];const entry={ticker:t,name:$('hm-name').value.trim(),shares,avgCost:avg,targetPrice:parseFloat($('hm-target').value)||0,stopLoss:parseFloat($('hm-stoploss').value)||0,note:$('hm-note').value.trim()};
-  if(App.editH) h[h.findIndex(x=>x.ticker===App.editH)]={...h[h.findIndex(x=>x.ticker===App.editH)],...entry};else{if(h.find(x=>x.ticker===t))return toast('이미 보유 종목에 있습니다');h.push(entry);}
+  const t=$('hm-ticker').value.toUpperCase().trim(),shares=parseFloat($('hm-shares').value),avg=parseFloat($('hm-avgcost').value);
+  if(!t||!shares||!avg)return toast('종목코드, 수량, 평단가는 필수입니다');
+  let h=load(K.holdings)||[];
+  const entry={ticker:t,name:$('hm-name').value.trim(),shares,avgCost:avg,
+    targetPrice:parseFloat($('hm-target').value)||0,stopLoss:parseFloat($('hm-stoploss').value)||0,
+    note:$('hm-note').value.trim(),
+    buyDate:$('hm-buydate').value||null,
+    lastBuyDate:$('hm-lastbuydate').value||null};
+  if(App.editH){
+    const idx=h.findIndex(x=>x.ticker===App.editH);
+    // 최초 매수일은 최초 저장값 유지 (비어있으면 현재 입력값 사용)
+    const orig=h[idx];
+    h[idx]={...orig,...entry, buyDate: entry.buyDate||(orig.buyDate||null)};
+  } else {
+    if(h.find(x=>x.ticker===t))return toast('이미 보유 종목에 있습니다');
+    h.push(entry);
+  }
   save(K.holdings,h);closeModal('holdingModal');render();refreshPrices();
 }
 function deleteHoldingTicker(t){if(confirm(`${t} 삭제할까요?`)){save(K.holdings,(load(K.holdings)||[]).filter(x=>x.ticker!==t));App.openRow=null;render();}}
@@ -1393,9 +1643,9 @@ async function initApp() {
   $('mnav-portfolio').classList.add('active');
   if (App.krw) $('krwToggle').classList.add('on');
   setupPctInputs();
+  checkVersion();
   setCloudStatus('🔄 데이터 불러오는 중...', 'var(--amber)');
   const hadCloudData = await pullFromCloud();
-  // Firebase에 데이터 없는데 localStorage에 기존 데이터가 있으면 즉시 Firebase에 백업
   if (!hadCloudData && (load(K.holdings) || load(K.journal) || load(K.watch))) {
     await pushToCloud();
   }
@@ -1404,6 +1654,14 @@ async function initApp() {
   if (localStorage.getItem(K.key)) refreshPrices();
   else setStatus('warn', 'API 키 필요 (⚙️ 설정)');
 }
+
+// 공유 링크 감지 — 로그인 전에 실행
+(function checkShareHash() {
+  const hash = location.hash;
+  if (hash.startsWith('#share=')) {
+    showShareView(hash.slice(7));
+  }
+})();
 </script>
 </body>
 </html>
