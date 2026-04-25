@@ -269,7 +269,7 @@ tbody td:first-child { text-align: left; padding-left: 0; }
 
   /* 히트맵/핫리스트 위젯 모바일 숨김 */
   .grid-2 { display: none; }
-  #earnings-container { padding: 0 14px; }
+  #ptf-earnings-container, #watch-earnings-container { padding: 0 14px; }
 
   /* 카드 래퍼 — 데스크톱용 -18px 네거티브 마진 제거 */
   #portfolioWrap, #watchlistWrap { margin: 0 !important; }
@@ -377,12 +377,12 @@ tbody td:first-child { text-align: left; padding-left: 0; }
       </div>
     </div>
 
-    <!-- 3. 실적 발표 캘린더 -->
+    <!-- 3. 실적 발표 캘린더 (보유 종목) -->
     <div class="section" style="margin-top:14px; margin-bottom:0; height:520px; display:flex; flex-direction:column;">
       <div class="section-header" style="margin-bottom: 8px;">
-        <span class="section-title">📅 내 종목 실적 발표 <span style="font-size:12px;font-weight:400;color:var(--sub);">— 과거 7일 · 향후 3주</span></span>
+        <span class="section-title">📅 보유 종목 실적 발표 <span style="font-size:12px;font-weight:400;color:var(--sub);">— 과거 7일 · 향후 3주</span></span>
       </div>
-      <div id="earnings-container" style="flex:1; overflow-y:auto; padding-right:4px;">
+      <div id="ptf-earnings-container" style="flex:1; overflow-y:auto; padding-right:4px;">
          <div style="text-align:center; padding:60px 20px; color:var(--sub);"><span class="spinner"></span> 실적 데이터를 불러오는 중...</div>
       </div>
     </div>
@@ -417,6 +417,16 @@ tbody td:first-child { text-align: left; padding-left: 0; }
     <div class="section" style="padding-bottom: 0;">
       <div class="section-header"><span class="section-title">👀 관심 종목</span><button class="btn btn-primary btn-sm" onclick="openAddWatchlist()">＋ 관심 추가</button></div>
       <div id="watchlistWrap" style="margin: 0 -18px;"></div>
+    </div>
+
+    <!-- 관심 종목 실적 발표 캘린더 -->
+    <div class="section" style="margin-top:14px; margin-bottom:0; height:460px; display:flex; flex-direction:column;">
+      <div class="section-header" style="margin-bottom: 8px;">
+        <span class="section-title">📅 관심 종목 실적 발표 <span style="font-size:12px;font-weight:400;color:var(--sub);">— 과거 7일 · 향후 3주</span></span>
+      </div>
+      <div id="watch-earnings-container" style="flex:1; overflow-y:auto; padding-right:4px;">
+        <div style="text-align:center; padding:60px 20px; color:var(--sub);"><span class="spinner"></span> 실적 데이터를 불러오는 중...</div>
+      </div>
     </div>
   </div>
 
@@ -723,86 +733,122 @@ async function fetchFinnhubNewsRaw(ticker) {
   } catch { return[]; }
 }
 
+const fmtRev = n => { if(!n) return '—'; const abs=Math.abs(n); if(abs>=1e9) return '$'+(n/1e9).toFixed(2)+'B'; if(abs>=1e6) return '$'+(n/1e6).toFixed(1)+'M'; return fmtUSD(n); };
+
+function renderEarningsTo(earnings, container) {
+  if(!container) return;
+  if(!earnings.length) {
+    container.innerHTML = '<div style="padding:40px 16px;text-align:center;color:var(--sub);">해당 기간 내 실적 발표가 없습니다.</div>';
+    return;
+  }
+  const todayStr = today();
+  const isDark = document.documentElement.getAttribute('data-theme')==='dark';
+  const hourMap = {'bmo':['장전','#dcfce7','#16a34a'],'amc':['장후','#fef9c3','#ca8a04'],'dmh':['장중','#e0f2fe','#0284c7']};
+  const badge = (tag,bg,fg,show) => show ? `<span style="font-size:10px;background:${bg};color:${fg};padding:2px 7px;border-radius:4px;font-weight:600;">${tag}</span>` : '';
+  container.innerHTML = earnings.map(e => {
+    const ed = new Date(e.date+'T12:00:00');
+    const td = new Date(todayStr+'T12:00:00');
+    const diff = Math.round((ed-td)/(864e5));
+    let dLabel, dBg, dFg;
+    if(diff<0){ dLabel=`D${diff}`; dBg='#f3f4f6'; dFg='#9ca3af'; }
+    else if(diff===0){ dLabel='D-DAY'; dBg='#fee2e2'; dFg='#dc2626'; }
+    else if(diff<=3){ dLabel=`D-${diff}`; dBg='#ffedd5'; dFg='#ea580c'; }
+    else{ dLabel=`D-${diff}`; dBg='#eff6ff'; dFg='#2563eb'; }
+    if(isDark){ dBg=dBg.replace('#f3f4f6','#374151').replace('#fee2e2','#7f1d1d').replace('#ffedd5','#7c2d12').replace('#eff6ff','#1e3a8a'); }
+    const [hLabel,hBg,hFg] = hourMap[e.hour]||['','',''];
+    const announced = e.epsActual!=null && diff<=0;
+    let epsBlock='', revBlock='';
+    if(announced){
+      const beat = e.epsEstimate!=null ? e.epsActual>=e.epsEstimate : null;
+      const beatLabel = beat===null?'':(beat?'✅ Beat':'❌ Miss');
+      const epsColor = beat===null?'var(--text)':(beat?'var(--green)':'var(--red)');
+      epsBlock=`<div style="font-size:11px;color:var(--sub);">EPS 실적 <span style="color:${epsColor};font-weight:700;">${beatLabel}</span></div>
+        <div style="font-size:12px;font-weight:700;color:${epsColor};">${e.epsActual.toFixed(2)}</div>
+        <div style="font-size:11px;color:var(--sub);">예상 ${e.epsEstimate!=null?e.epsEstimate.toFixed(2):'—'}</div>`;
+      if(e.revenueActual) revBlock=`<div style="font-size:11px;color:var(--sub);margin-top:3px;">매출 <span style="color:var(--text);font-weight:600;">${fmtRev(e.revenueActual)}</span></div>`;
+    } else {
+      epsBlock=`<div style="font-size:11px;color:var(--sub);">예상 EPS</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);">${e.epsEstimate!=null?e.epsEstimate.toFixed(2):'—'}</div>`;
+      if(e.revenueEstimate) revBlock=`<div style="font-size:11px;color:var(--sub);margin-top:3px;">예상 매출 <span style="color:var(--text);font-weight:600;">${fmtRev(e.revenueEstimate)}</span></div>`;
+    }
+    const px=App.px[e.symbol];
+    const priceBlock=px?`<div style="font-size:12px;color:var(--sub);margin-top:3px;">${fmtUSD(px.price)} <span class="${cls(px.changePercent)}" style="font-weight:600;">${fmtPct(px.changePercent)}</span></div>`:'';
+    const dateStr=`${ed.getMonth()+1}/${ed.getDate()}`;
+    const quarter=e.quarter&&e.year?` · ${e.year} Q${e.quarter}`:'';
+    return `<div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:10px;${diff<0?'opacity:0.65':''}">
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:5px;">
+          <span style="font-size:16px;font-weight:700;color:var(--blue);">${e.symbol}</span>
+          ${badge(hLabel,hBg,hFg,!!hLabel)}
+        </div>
+        <div style="font-size:12px;color:var(--sub);">${dateStr}${quarter}</div>
+        ${priceBlock}
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="display:inline-block;background:${dBg};color:${dFg};font-size:13px;font-weight:700;padding:3px 10px;border-radius:6px;margin-bottom:7px;">${dLabel}</div>
+        ${epsBlock}${revBlock}
+      </div>
+    </div>`;
+  }).join('');
+}
+
 async function fetchEarnings() {
   const key = localStorage.getItem(K.key); if(!key) return;
-  const fmtRev = n => { if(!n) return '—'; const abs=Math.abs(n); if(abs>=1e9) return '$'+(n/1e9).toFixed(2)+'B'; if(abs>=1e6) return '$'+(n/1e6).toFixed(1)+'M'; return fmtUSD(n); };
+  const dateFmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const fromD = new Date(); fromD.setDate(fromD.getDate()-7);
   const toD   = new Date(); toD.setDate(toD.getDate()+21);
-  const from = `${fromD.getFullYear()}-${String(fromD.getMonth()+1).padStart(2,'0')}-${String(fromD.getDate()).padStart(2,'0')}`;
-  const to   = `${toD.getFullYear()}-${String(toD.getMonth()+1).padStart(2,'0')}-${String(toD.getDate()).padStart(2,'0')}`;
+  const from = dateFmt(fromD), to = dateFmt(toD);
+
+  const holdings = load(K.holdings)||[];
+  const watchlist = load(K.watch)||[];
+  const holdSet = new Set(holdings.map(x=>x.ticker));
+  const watchSet = new Set(watchlist.map(x=>x.ticker));
+  const allMyTickers = new Set([...holdSet, ...watchSet]);
+
+  const ptfEl   = $('ptf-earnings-container');
+  const watchEl = $('watch-earnings-container');
+  const loadHtml = '<div style="padding:30px 16px;text-align:center;color:var(--sub);"><span class="spinner"></span> 불러오는 중...</div>';
+  if(ptfEl)   ptfEl.innerHTML   = loadHtml;
+  if(watchEl) watchEl.innerHTML = loadHtml;
+
   try {
+    // 1. 브로드 캘린더 조회 (전체 일정)
     const res = await fetch(`https://finnhub.io/api/v1/calendar/earnings?from=${from}&to=${to}&token=${key}`);
     const data = await res.json();
-    const allEarnings = data.earningsCalendar || [];
-    const holdings = load(K.holdings)||[]; const watchlist = load(K.watch)||[];
-    const holdSet = new Set(holdings.map(x=>x.ticker));
-    const watchSet = new Set(watchlist.map(x=>x.ticker));
-    const myEarnings = allEarnings.filter(e => holdSet.has(e.symbol)||watchSet.has(e.symbol));
-    const container = $('earnings-container');
-    if(!myEarnings.length) {
-      container.innerHTML = '<div style="padding:60px 20px; text-align:center; color:var(--sub);">최근 3주 내에 예정된<br>내 종목 실적 발표가 없습니다.</div>';
-      return;
-    }
-    myEarnings.sort((a,b) => new Date(a.date)-new Date(b.date));
-    const todayStr = today();
-    const isDark = document.documentElement.getAttribute('data-theme')==='dark';
-    container.innerHTML = myEarnings.map(e => {
-      const ed = new Date(e.date+'T12:00:00');
-      const td = new Date(todayStr+'T12:00:00');
-      const diff = Math.round((ed-td)/(864e5));
-      // D-Day 배지
-      let dLabel, dBg, dFg;
-      if(diff<0){ dLabel=`D${diff}`; dBg='#f3f4f6'; dFg='#9ca3af'; }
-      else if(diff===0){ dLabel='D-DAY'; dBg='#fee2e2'; dFg='#dc2626'; }
-      else if(diff<=3){ dLabel=`D-${diff}`; dBg='#ffedd5'; dFg='#ea580c'; }
-      else { dLabel=`D-${diff}`; dBg='#eff6ff'; dFg='#2563eb'; }
-      if(isDark){ dBg=dBg.replace('#f3f4f6','#374151').replace('#fee2e2','#7f1d1d').replace('#ffedd5','#7c2d12').replace('#eff6ff','#1e3a8a'); }
-      // 발표 시간 배지
-      const hourMap={'bmo':['장전','#dcfce7','#16a34a'],'amc':['장후','#fef9c3','#ca8a04'],'dmh':['장중','#e0f2fe','#0284c7']};
-      const [hLabel,hBg,hFg] = hourMap[e.hour]||['','',''];
-      // 종목 구분 배지
-      const isHold = holdSet.has(e.symbol);
-      const [tLabel,tBg,tFg] = isHold ? ['보유','#eff6ff','#2563eb'] : ['관심','#f5f3ff','#7c3aed'];
-      // EPS/매출
-      const announced = e.epsActual!==null && e.epsActual!==undefined && diff<=0;
-      let epsBlock='', revBlock='';
-      if(announced){
-        const beat = e.epsEstimate!=null ? e.epsActual>=e.epsEstimate : null;
-        const beatLabel = beat===null?'':(beat?'✅ Beat':'❌ Miss');
-        const epsColor = beat===null?'var(--text)':(beat?'var(--green)':'var(--red)');
-        epsBlock=`<div style="font-size:11px;color:var(--sub);">EPS 실적 <span style="color:${epsColor};font-weight:700;">${beatLabel}</span></div>
-          <div style="font-size:12px;font-weight:700;color:${epsColor};">${e.epsActual.toFixed(2)}</div>
-          <div style="font-size:11px;color:var(--sub);">예상 ${e.epsEstimate!=null?e.epsEstimate.toFixed(2):'—'}</div>`;
-        if(e.revenueActual) revBlock=`<div style="font-size:11px;color:var(--sub);margin-top:3px;">매출 <span style="color:var(--text);font-weight:600;">${fmtRev(e.revenueActual)}</span></div>`;
-      } else {
-        epsBlock=`<div style="font-size:11px;color:var(--sub);">예상 EPS</div>
-          <div style="font-size:13px;font-weight:700;color:var(--text);">${e.epsEstimate!=null?e.epsEstimate.toFixed(2):'—'}</div>`;
-        if(e.revenueEstimate) revBlock=`<div style="font-size:11px;color:var(--sub);margin-top:3px;">예상 매출 <span style="color:var(--text);font-weight:600;">${fmtRev(e.revenueEstimate)}</span></div>`;
+    let allEarnings = data.earningsCalendar || [];
+
+    // 2. 캘린더에 없는 내 종목 파악 → 개별 조회로 보완
+    const foundTickers = new Set(allEarnings.filter(e=>allMyTickers.has(e.symbol)).map(e=>e.symbol));
+    const missingTickers = [...allMyTickers].filter(t=>!foundTickers.has(t));
+    if(missingTickers.length) {
+      for(let i=0; i<missingTickers.length; i+=3) {
+        const batch = missingTickers.slice(i,i+3);
+        const results = await Promise.allSettled(
+          batch.map(t => fetch(`https://finnhub.io/api/v1/calendar/earnings?symbol=${t}&from=${from}&to=${to}&token=${key}`)
+            .then(r=>r.json()).then(d=>d.earningsCalendar||[]))
+        );
+        results.forEach(r=>{ if(r.status==='fulfilled') allEarnings.push(...r.value); });
+        if(i+3<missingTickers.length) await new Promise(r=>setTimeout(r,350));
       }
-      // 현재가
-      const px=App.px[e.symbol];
-      const priceBlock=px?`<div style="font-size:12px;color:var(--sub);margin-top:3px;">${fmtUSD(px.price)} <span class="${cls(px.changePercent)}" style="font-weight:600;">${fmtPct(px.changePercent)}</span></div>`:'';
-      const dateStr=`${ed.getMonth()+1}/${ed.getDate()}`;
-      const quarter=e.quarter&&e.year?` · ${e.year} Q${e.quarter}`:'';
-      const badge=(tag,bg,fg,show)=>show?`<span style="font-size:10px;background:${bg};color:${fg};padding:2px 7px;border-radius:4px;font-weight:600;">${tag}</span>`:'';
-      return `<div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:10px;${diff<0?'opacity:0.65':''}">
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:5px;">
-            <span style="font-size:16px;font-weight:700;color:var(--blue);">${e.symbol}</span>
-            ${badge(tLabel,tBg,tFg,true)}
-            ${badge(hLabel,hBg,hFg,!!hLabel)}
-          </div>
-          <div style="font-size:12px;color:var(--sub);">${dateStr}${quarter}</div>
-          ${priceBlock}
-        </div>
-        <div style="text-align:right;flex-shrink:0;">
-          <div style="display:inline-block;background:${dBg};color:${dFg};font-size:13px;font-weight:700;padding:3px 10px;border-radius:6px;margin-bottom:7px;">${dLabel}</div>
-          ${epsBlock}${revBlock}
-        </div>
-      </div>`;
-    }).join('');
-  } catch(e) {
-    $('earnings-container').innerHTML = '<div style="padding:60px 20px; text-align:center; color:var(--red);">실적 데이터를 불러오지 못했습니다.</div>';
+    }
+
+    // 3. 중복 제거 후 탭별 분리
+    const seen = new Set();
+    const dedup = arr => arr.filter(e=>{ const k=`${e.symbol}_${e.date}`; if(seen.has(k)) return false; seen.add(k); return true; });
+    const sort  = arr => [...arr].sort((a,b)=>new Date(a.date)-new Date(b.date));
+
+    const ptfEarnings   = sort(dedup(allEarnings.filter(e=>holdSet.has(e.symbol))));
+    // seen set 초기화 후 관심종목 dedup (보유와 겹치는 종목 제외)
+    const watchOnly = allEarnings.filter(e=>watchSet.has(e.symbol)&&!holdSet.has(e.symbol));
+    const seenW = new Set();
+    const watchEarnings = sort(watchOnly.filter(e=>{ const k=`${e.symbol}_${e.date}`; if(seenW.has(k)) return false; seenW.add(k); return true; }));
+
+    renderEarningsTo(ptfEarnings, ptfEl);
+    renderEarningsTo(watchEarnings, watchEl);
+  } catch(err) {
+    const errHtml = '<div style="padding:30px 16px;text-align:center;color:var(--red);">실적 데이터를 불러오지 못했습니다.</div>';
+    if(ptfEl)   ptfEl.innerHTML   = errHtml;
+    if(watchEl) watchEl.innerHTML = errHtml;
   }
 }
 
