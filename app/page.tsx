@@ -1,34 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getFirebaseAuth } from '@/lib/firebase';
 import { demoShareUrl } from '@/lib/demoShare';
 
-type AuthState = 'checking' | 'guest' | 'user';
-
 export default function Landing() {
-  const [authState, setAuthState] = useState<AuthState>('checking');
-
+  // 로그인된 사용자는 랜딩 잠깐 깜빡 후 곧장 /app으로.
+  // 비로그인은 그대로 랜딩을 봄. SSR 시점에는 항상 랜딩 마크업이 나가므로 SEO/초기 렌더 정상.
   useEffect(() => {
-    // 이미 로그인된 친구는 랜딩 보지 않고 바로 앱으로.
     const unsub = onAuthStateChanged(getFirebaseAuth(), (user) => {
-      if (user) {
-        window.location.replace('/app');
-      } else {
-        setAuthState('guest');
-      }
+      if (user) window.location.replace('/open');
     });
     return () => unsub();
   }, []);
-
-  if (authState === 'checking') {
-    return (
-      <main className="flex min-h-screen items-center justify-center">
-        <div className="text-sub text-sm">불러오는 중…</div>
-      </main>
-    );
-  }
 
   return (
     <main className="min-h-screen">
@@ -58,7 +43,7 @@ function Header() {
             데모 둘러보기
           </a>
           <a
-            href="/app"
+            href="/open"
             className="inline-flex items-center gap-1.5 text-sm font-semibold bg-brand text-white px-4 py-2 rounded-lg hover:opacity-90 transition"
           >
             시작하기 <span aria-hidden>→</span>
@@ -91,7 +76,7 @@ function Hero() {
         </p>
         <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
           <a
-            href="/app"
+            href="/open"
             className="inline-flex items-center justify-center gap-2 bg-brand text-white font-semibold px-6 py-3 rounded-xl hover:opacity-90 transition shadow-lg shadow-brand/20"
           >
             <GoogleIcon /> Google로 시작 (무료)
@@ -207,7 +192,7 @@ function Showcase() {
               👀 데모 공유 화면 열기
             </a>
             <a
-              href="/app"
+              href="/open"
               className="inline-flex items-center justify-center gap-2 bg-card border border-border font-semibold px-5 py-2.5 rounded-lg hover:bg-bg transition"
             >
               내 계정으로 시작하기
@@ -278,7 +263,7 @@ function CTA() {
           Google 계정으로 로그인하면 1초 안에 사용 시작. 별도 가입·결제·앱 설치 없음.
         </p>
         <a
-          href="/app"
+          href="/open"
           className="inline-flex items-center justify-center gap-2 bg-brand text-white font-semibold px-7 py-3.5 rounded-xl hover:opacity-90 transition shadow-lg shadow-brand/20 text-base"
         >
           <GoogleIcon /> Google로 시작
@@ -295,7 +280,7 @@ function Footer() {
         <div>© {new Date().getFullYear()} 스윙 포트폴리오 트래커</div>
         <div className="flex items-center gap-4">
           <a href={demoShareUrl} className="hover:text-text">데모</a>
-          <a href="/app" className="hover:text-text">앱 열기</a>
+          <a href="/open" className="hover:text-text">앱 열기</a>
           <a href="/v2" className="hover:text-text">v2 미리보기</a>
         </div>
       </div>
