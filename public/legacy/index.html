@@ -548,21 +548,18 @@ tbody td:first-child { text-align: left; padding-left: 0; }
 </div>
 
 <div class="modal-overlay" id="apiModal">
-  <div class="modal" style="width:420px;">
-    <h2>🔑 API 키 설정</h2>
-    <div style="background:#eff6ff; border:1px solid #bfdbfe; padding:12px; border-radius:8px; margin-bottom:14px; font-size:12px; color:#1e3a8a; line-height:1.5;">
-      <strong>📌 Finnhub API 발급 가이드</strong><br>
-      1. <a href="https://finnhub.io" target="_blank" style="color:var(--blue); font-weight:bold;">finnhub.io</a> 접속 후 무료 회원가입<br>
-      2. 로그인 후 대시보드(Dashboard) 화면으로 이동<br>
-      3. <b>API Key</b> 라고 적힌 영문/숫자 복사 후 아래 입력칸에 붙여넣기
+  <div class="modal" style="width:440px;">
+    <h2>🔑 시세 데이터 (Finnhub)</h2>
+    <div style="background:#f0fdf4; border:1px solid #bbf7d0; padding:14px; border-radius:8px; margin-bottom:14px; font-size:13px; color:#166534; line-height:1.6;">
+      <strong>✅ 공용 API 키 사용 중</strong><br>
+      별도 설정 없이 바로 시세·뉴스·실적 일정을 조회할 수 있습니다. 키는 서버에서 관리되며 클라이언트에는 노출되지 않습니다.
     </div>
-    <div class="form-group">
-      <label>📈 Finnhub API 키 <span class="optional-label">필수</span></label>
-      <input id="api-finnhub" type="password" placeholder="여기에 붙여넣기">
+    <div style="background:var(--bg); border:1px solid var(--border); padding:12px; border-radius:8px; font-size:12px; color:var(--sub); line-height:1.6;">
+      ℹ️ 모든 호출은 본인 Google 계정으로 인증 후 처리됩니다.<br>
+      ℹ️ 동일 종목은 서버에서 짧게 캐시되어 쿼터를 절약합니다.
     </div>
     <div class="form-actions">
-      <button class="btn btn-secondary" onclick="closeModal('apiModal')">취소</button>
-      <button class="btn btn-primary" onclick="saveApiKeys()">저장 후 조회</button>
+      <button class="btn btn-primary" onclick="closeModal('apiModal')">확인</button>
     </div>
   </div>
 </div>
@@ -1059,8 +1056,23 @@ function setupPctInputs() {
 // ─────────────────────────────────────────────
 //  API & PRICE & EARNINGS FETCH
 // ─────────────────────────────────────────────
-function openApiKeyModal() { $('api-finnhub').value = localStorage.getItem(K.key)||''; $('apiModal').classList.add('show'); }
-function saveApiKeys() { localStorage.setItem(K.key, $('api-finnhub').value.trim()); schedulePush(); closeModal('apiModal'); refreshPrices(); toast('✅ API 키 저장 완료'); }
+// Phase 3: 모든 사용자가 서버에 등록된 공용 Finnhub 키를 사용. 개인 키 저장 불필요.
+// 모달은 정보 안내용으로만 유지 (기존 진입점 호환).
+function openApiKeyModal() { $('apiModal').classList.add('show'); }
+function saveApiKeys() { closeModal('apiModal'); }
+
+// Firebase ID 토큰을 붙여 서버 프록시(/api/finnhub/*)를 호출.
+// 서버 측에서 토큰 검증 후 공용 API 키로 Finnhub에 요청.
+async function callFinnhubProxy(path, params) {
+  const u = (typeof firebase !== 'undefined') ? firebase.auth().currentUser : null;
+  if (!u) throw new Error('AUTH');
+  const token = await u.getIdToken();
+  const qs = new URLSearchParams(params).toString();
+  return fetch(`/api/finnhub/${path}?${qs}`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+    signal: AbortSignal.timeout(10000),
+  });
+}
 
 function detectMarketState() {
   const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })); const mins = et.getHours() * 60 + et.getMinutes();
@@ -1068,9 +1080,9 @@ function detectMarketState() {
   if (mins >= 570 && mins < 960) return 'REGULAR'; if (mins >= 240 && mins < 570) return 'PRE'; if (mins >= 960 && mins < 1200) return 'POST'; return 'CLOSED';
 }
 
-async function fetchFinnhub(ticker, apiKey) {
+async function fetchFinnhub(ticker) {
   try {
-    const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${apiKey}`, { signal: AbortSignal.timeout(6000) });
+    const res = await callFinnhubProxy('quote', { symbol: ticker });
     if(res.status===401) throw new Error('AUTH'); if(res.status===429) throw new Error('LIMIT'); if(!res.ok) throw new Error('HTTP');
     const d = await res.json(); if(d.c === undefined || d.c === null) throw new Error('INVALID');
     return { price: d.c, changePercent: d.dp || 0, prevClose: d.pc || d.c, name: ticker };
@@ -1078,10 +1090,9 @@ async function fetchFinnhub(ticker, apiKey) {
 }
 
 async function fetchFinnhubNewsRaw(ticker) {
-  const key = localStorage.getItem(K.key); if (!key) return[];
   const d = new Date(); const to = d.toISOString().slice(0, 10); d.setDate(d.getDate() - 7); const from = d.toISOString().slice(0, 10);
   try {
-    const res = await fetch(`https://finnhub.io/api/v1/company-news?symbol=${ticker}&from=${from}&to=${to}&token=${key}`);
+    const res = await callFinnhubProxy('company-news', { symbol: ticker, from, to });
     return await res.json();
   } catch { return[]; }
 }
@@ -1146,7 +1157,6 @@ function renderEarningsTo(earnings, container) {
 }
 
 async function fetchEarnings() {
-  const key = localStorage.getItem(K.key); if(!key) return;
   const dateFmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const fromD = new Date(); fromD.setDate(fromD.getDate()-7);
   const toD   = new Date(); toD.setDate(toD.getDate()+21);
@@ -1166,7 +1176,7 @@ async function fetchEarnings() {
 
   try {
     // 1. 브로드 캘린더 조회 (전체 일정)
-    const res = await fetch(`https://finnhub.io/api/v1/calendar/earnings?from=${from}&to=${to}&token=${key}`);
+    const res = await callFinnhubProxy('calendar/earnings', { from, to });
     const data = await res.json();
     let allEarnings = data.earningsCalendar || [];
 
@@ -1177,7 +1187,7 @@ async function fetchEarnings() {
       for(let i=0; i<missingTickers.length; i+=3) {
         const batch = missingTickers.slice(i,i+3);
         const results = await Promise.allSettled(
-          batch.map(t => fetch(`https://finnhub.io/api/v1/calendar/earnings?symbol=${t}&from=${from}&to=${to}&token=${key}`)
+          batch.map(t => callFinnhubProxy('calendar/earnings', { symbol: t, from, to })
             .then(r=>r.json()).then(d=>d.earningsCalendar||[]))
         );
         results.forEach(r=>{ if(r.status==='fulfilled') allEarnings.push(...r.value); });
@@ -1208,14 +1218,13 @@ async function fetchEarnings() {
 async function refreshPrices() {
   const allTickers =[...new Set([...(load(K.holdings)||[]).map(x=>x.ticker), ...(load(K.watch)||[]).map(x=>x.ticker)])];
   if (!allTickers.length) return;
-  const apiKey = localStorage.getItem(K.key); if (!apiKey) return openApiKeyModal();
 
   $('refreshBtn').classList.add('spinning');
   try {
     fetch('https://open.er-api.com/v6/latest/USD').then(r=>r.json()).then(d=> App.rate = d.rates.KRW).catch(()=>{});
     const results =[];
     for (let i = 0; i < allTickers.length; i += 5) {
-      results.push(...await Promise.allSettled(allTickers.slice(i, i+5).map(t => fetchFinnhub(t, apiKey).then(data => ({ ticker: t, data })))));
+      results.push(...await Promise.allSettled(allTickers.slice(i, i+5).map(t => fetchFinnhub(t).then(data => ({ ticker: t, data })))));
       if (i+5 < allTickers.length) await new Promise(r => setTimeout(r, 200));
     }
 
@@ -1228,8 +1237,8 @@ async function refreshPrices() {
     const msLabel = ms==='REGULAR'?'🟢 장중':ms==='PRE'?'🟡 프리마켓':ms==='POST'?'🟠 애프터마켓':'⚫ 장마감';
     const timeStr = new Date().toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' });
 
-    if (err==='AUTH') { setStatus('fail','API 키 오류'); toast('⚠️ Finnhub API 키를 확인해주세요'); }
-    else if (err==='LIMIT') { setStatus('warn','API 한도 초과'); }
+    if (err==='AUTH') { setStatus('fail','인증 만료'); toast('⚠️ 로그인이 만료됐습니다. 페이지를 새로고침해주세요'); }
+    else if (err==='LIMIT') { setStatus('warn','API 한도 초과 (서버 캐시 활용 중)'); }
     else if (fc>0 && sc===0) setStatus('fail','조회 실패');
     else if (fc>0) setStatus('warn',`${msLabel} · ${fc}개 실패`);
     else setStatus('live',`${msLabel} · ${timeStr}${App.rate ? ` · ₩${Math.round(App.rate).toLocaleString()}` : ''}`);
@@ -1960,8 +1969,8 @@ async function initApp() {
   }
   render();
   initTvWidgets();
-  if (localStorage.getItem(K.key)) refreshPrices();
-  else setStatus('warn', 'API 키 필요 (⚙️ 설정)');
+  // Phase 3: 공용 API 키가 서버에 등록돼 있으므로 항상 시세 조회 시도.
+  refreshPrices();
 }
 
 // 공유 링크 감지 — 로그인 전에 실행
