@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: 240 242 245;
+    --card: 255 255 255;
+    --border: 229 231 235;
+    --text: 17 24 39;
+    --sub: 107 114 128;
+  }
+
+  .dark {
+    --bg: 17 24 39;
+    --card: 31 41 55;
+    --border: 55 65 81;
+    --text: 249 250 251;
+    --sub: 156 163 175;
+  }
+
+  html, body {
+    background: rgb(var(--bg));
+    color: rgb(var(--text));
+  }
+}
