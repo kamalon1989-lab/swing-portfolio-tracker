@@ -1,13 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Phase 1: 루트(/)와 기존 진입점들을 legacy HTML로 라우팅.
-  // beforeFiles를 써야 app/page.tsx나 public/index.html보다 먼저 적용됨.
-  // Phase 4에서 새 랜딩으로 승격시킬 때 이 rewrites 블록을 제거하면 됨.
+  // / 는 Next.js 새 랜딩(app/page.tsx)이 서빙.
+  // /app 는 legacy 앱으로 rewrite (URL은 /app 유지). 기존 직접 URL들도 /app과 동일 동작.
+  // Phase 4에서 legacy 제거 시 이 rewrites를 비우면 됨.
   async rewrites() {
     return {
       beforeFiles: [
-        { source: '/', destination: '/legacy/index.html' },
+        { source: '/app', destination: '/legacy/index.html' },
+        { source: '/app/:path*', destination: '/legacy/index.html' },
         { source: '/index.html', destination: '/legacy/index.html' },
         { source: '/ai_studio_code2.1.html', destination: '/legacy/index.html' },
         { source: '/ai_studio_code1.5.html', destination: '/legacy/index.html' },
