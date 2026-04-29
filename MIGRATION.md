@@ -52,7 +52,7 @@ npm run dev
 | 1 | ✅ | Next.js 스캐폴딩 + legacy 보존 |
 | 2 | ✅ | 랜딩 페이지(#7) + 데모 모드 + /open URL |
 | 3 | ✅ | Finnhub API 서버 프록시(#8) — 공용 키, 토큰 검증, edge 캐싱 |
-| 4 | ⏳ | 도메인 컷오버 (rewrite 제거, /v2 → /로 승격) |
+| 4 | ✅ | 도메인 컷오버 (루트 index.html 제거, /v2 → /open 리다이렉트, 상태 페이지 완료 표시) |
 
 ## Phase 3: Vercel 환경변수 설정 (필수)
 
