@@ -3,7 +3,8 @@
 import { useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getFirebaseAuth } from '@/lib/firebase';
-import { demoShareUrl } from '@/lib/demoShare';
+
+const demoUrl = '/open?demo=1';
 
 export default function Landing() {
   // 로그인된 사용자는 랜딩 잠깐 깜빡 후 곧장 /app으로.
@@ -37,7 +38,7 @@ function Header() {
         </div>
         <div className="flex items-center gap-2">
           <a
-            href={demoShareUrl}
+            href={demoUrl}
             className="hidden sm:inline-flex text-sm font-medium text-sub hover:text-text px-3 py-2"
           >
             데모 둘러보기
@@ -82,7 +83,7 @@ function Hero() {
             <GoogleIcon /> Google로 시작 (무료)
           </a>
           <a
-            href={demoShareUrl}
+            href={demoUrl}
             className="inline-flex items-center justify-center gap-2 bg-card border border-border text-text font-semibold px-6 py-3 rounded-xl hover:bg-bg transition"
           >
             <span>👀</span> 로그인 없이 데모 보기
@@ -168,8 +169,8 @@ function Showcase() {
             로그인 없이 먼저 둘러보세요
           </h2>
           <p className="text-sub leading-relaxed mb-6">
-            샘플 포트폴리오로 공유 화면이 어떻게 보이는지 즉시 확인할 수 있습니다.
-            본인 데이터로는 Google 로그인 후 자유롭게 추가/수정/삭제 가능.
+            샘플 데이터로 포트폴리오, 관심 종목, 매매 일지, 자산 분석까지
+            모든 탭을 로그인 없이 직접 탐색할 수 있습니다.
           </p>
           <ul className="space-y-2.5 text-sm mb-8">
             {[
@@ -186,10 +187,10 @@ function Showcase() {
           </ul>
           <div className="flex flex-col sm:flex-row gap-3">
             <a
-              href={demoShareUrl}
+              href={demoUrl}
               className="inline-flex items-center justify-center gap-2 bg-brand text-white font-semibold px-5 py-2.5 rounded-lg hover:opacity-90 transition"
             >
-              👀 데모 공유 화면 열기
+              👀 앱 전체 데모 보기
             </a>
             <a
               href="/open"
@@ -279,7 +280,7 @@ function Footer() {
       <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-sub">
         <div>© {new Date().getFullYear()} 스윙 포트폴리오 트래커</div>
         <div className="flex items-center gap-4">
-          <a href={demoShareUrl} className="hover:text-text">데모</a>
+          <a href={demoUrl} className="hover:text-text">데모</a>
           <a href="/open" className="hover:text-text">앱 열기</a>
           <a href="/v2" className="hover:text-text">v2 미리보기</a>
         </div>
