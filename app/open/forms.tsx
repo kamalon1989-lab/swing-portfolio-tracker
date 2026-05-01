@@ -17,10 +17,10 @@ export function HoldingForm({
     item ?? { ticker: '', name: '', shares: 0, avgCost: 0, targetPrice: 0, stopLoss: 0, note: '', buyDate: today() }
   );
   return (
-    <Modal title={item ? '보유 티커 수정' : '보유 티커 추가'} onClose={onClose}>
+    <Modal title={item ? '보유 종목 수정' : '보유 종목 추가'} onClose={onClose}>
       <form className="grid gap-3 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); onSave(form); }}>
         <Field label="티커" required><input className={`${inputClass()} uppercase`} value={form.ticker} disabled={!!item} onChange={(e) => setForm({ ...form, ticker: e.target.value.toUpperCase() })} /></Field>
-        <Field label="티커명" optional><input className={inputClass()} value={form.name ?? ''} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+        <Field label="종목명" optional><input className={inputClass()} value={form.name ?? ''} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
         <Field label="수량" required><input className={inputClass()} type="number" step="0.0001" value={form.shares || ''} onChange={(e) => setForm({ ...form, shares: Number(e.target.value) })} /></Field>
         <Field label="평단" required><input className={inputClass()} type="number" step="0.01" value={form.avgCost || ''} onChange={(e) => setForm({ ...form, avgCost: Number(e.target.value) })} /></Field>
         <Field label="목표가" optional><input className={inputClass()} type="number" step="0.01" value={form.targetPrice || ''} onChange={(e) => setForm({ ...form, targetPrice: Number(e.target.value) })} /></Field>
@@ -44,10 +44,10 @@ export function WatchForm({
 }) {
   const [form, setForm] = useState<WatchItem>(item ?? { ticker: '', name: '', targetBuy: 0, note: '' });
   return (
-    <Modal title={item ? '관심 티커 수정' : '관심 티커 추가'} onClose={onClose}>
+    <Modal title={item ? '관심 종목 수정' : '관심 종목 추가'} onClose={onClose}>
       <form className="grid gap-3 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); onSave(form); }}>
         <Field label="티커" required><input className={`${inputClass()} uppercase`} value={form.ticker} disabled={!!item} onChange={(e) => setForm({ ...form, ticker: e.target.value.toUpperCase() })} /></Field>
-        <Field label="티커명" optional><input className={inputClass()} value={form.name ?? ''} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+        <Field label="종목명" optional><input className={inputClass()} value={form.name ?? ''} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
         <Field label="목표 진입가" optional><input className={inputClass()} type="number" step="0.01" value={form.targetBuy || ''} onChange={(e) => setForm({ ...form, targetBuy: Number(e.target.value) })} /></Field>
         <Field label="메모" optional><input className={inputClass()} value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></Field>
         <button className="rounded-lg bg-brand px-4 py-2 font-bold text-white sm:col-span-2">저장</button>
@@ -80,7 +80,7 @@ export function TradeForm({
         <Field label="수량" required><input className={inputClass()} type="number" step="0.0001" value={form.shares || ''} onChange={(e) => setForm({ ...form, shares: Number(e.target.value) })} /></Field>
         <Field label="단가" required><input className={inputClass()} type="number" step="0.01" value={form.price || ''} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} /></Field>
         <Field label="수수료" optional><input className={inputClass()} type="number" step="0.01" value={form.fee || ''} onChange={(e) => setForm({ ...form, fee: Number(e.target.value) })} /></Field>
-        <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={sync} disabled={!!item} onChange={(e) => setSync(e.target.checked)} /> 보유 티커와 예수금에 반영</label>
+        <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={sync} disabled={!!item} onChange={(e) => setSync(e.target.checked)} /> 보유 종목과 예수금에 반영</label>
         <Field label="메모" optional><input className={inputClass()} value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></Field>
         <button className="rounded-lg bg-brand px-4 py-2 font-bold text-white sm:col-span-2">저장</button>
       </form>

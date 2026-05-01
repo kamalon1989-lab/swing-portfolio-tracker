@@ -336,14 +336,14 @@ export function TickerDetail({
 
 function TickerEarningsSummary({ ticker, earnings }: { ticker: string; earnings: EarningsItem[] }) {
   const nearestEarnings = earnings
-    .filter((item) => item.symbol === ticker)
+    .filter((item) => earningsSymbolMatches(ticker, item.symbol))
     .sort((a, b) => a.date.localeCompare(b.date))[0];
   if (!nearestEarnings) return null;
   return (
     <div className="rounded-lg border border-border p-3 text-xs">
       <div className="flex items-center justify-between gap-2">
         <span className="font-bold">가까운 실적</span>
-        <span className="text-sub">{nearestEarnings.date}</span>
+        <span className="text-sub">{formatEarningsDate(nearestEarnings)} · {formatEarningsHour(nearestEarnings.hour)}</span>
       </div>
       <div className="mt-1 text-sub">EPS 예상 {nearestEarnings.epsEstimate ?? '-'} · 매출 예상 {formatRevenue(nearestEarnings.revenueEstimate)}</div>
     </div>
@@ -381,7 +381,7 @@ export function EarningsPanel({ earnings, loading, onRefresh }: { earnings: Earn
               <strong className="text-brand">{item.symbol}</strong>
               <span className="flex items-center gap-2 text-xs text-sub">
                 {result && <b className={`rounded-full px-2 py-0.5 ${result === 'beat' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{result.toUpperCase()}</b>}
-                {item.date} {item.hour ? `· ${item.hour.toUpperCase()}` : ''}
+                {formatEarningsDate(item)} · {formatEarningsHour(item.hour)}
               </span>
             </div>
             <div className="mt-1 grid gap-1 text-xs text-sub">
@@ -401,4 +401,36 @@ export function EarningsPanel({ earnings, loading, onRefresh }: { earnings: Earn
 function formatRevenue(value?: number) {
   if (typeof value !== 'number') return '-';
   return `$${(value / 1000000000).toLocaleString('en-US', { maximumFractionDigits: 2 })}B`;
+}
+
+function formatEarningsDate(item: EarningsItem) {
+  return `${item.date} · ${earningsDday(item.date)}`;
+}
+
+function earningsDday(date: string) {
+  const days = daysUntil(date);
+  if (days === null) return 'D-?';
+  if (days === 0) return 'D-Day';
+  return days > 0 ? `D-${days}` : `D+${Math.abs(days)}`;
+}
+
+function daysUntil(date: string) {
+  const event = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(event.getTime())) return null;
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.floor((event.getTime() - todayStart.getTime()) / 86400000);
+}
+
+function formatEarningsHour(hour?: string) {
+  const key = hour?.toLowerCase();
+  if (key === 'bmo' || key === 'before market open') return '장전';
+  if (key === 'amc' || key === 'after market close') return '장후';
+  if (key === 'dmh' || key === 'during market hours') return '장중';
+  return '시간 미정';
+}
+
+function earningsSymbolMatches(ticker: string, symbol: string) {
+  if (ticker === symbol) return true;
+  return (ticker === 'GOOGL' && symbol === 'GOOG') || (ticker === 'GOOG' && symbol === 'GOOGL');
 }

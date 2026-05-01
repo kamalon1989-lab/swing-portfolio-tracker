@@ -93,7 +93,7 @@ export function PortfolioView(props: {
         ))}
       </div>
       <div className="no-print flex flex-wrap gap-2 rounded-xl border border-border bg-card p-3">
-        <button onClick={props.onAdd} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">보유 티커 추가</button>
+        <button onClick={props.onAdd} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">보유 종목 추가</button>
         <button onClick={props.onRecord} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">오늘 기록</button>
         <button onClick={props.onShare} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">공유 링크</button>
         <button onClick={props.onPdf} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">PDF 내보내기</button>
@@ -145,7 +145,7 @@ export function PortfolioView(props: {
             ))}
           </tbody>
         </table>
-        {!props.rows.length && <div className="p-12 text-center text-sm text-sub">보유 티커가 없습니다.</div>}
+        {!props.rows.length && <div className="p-12 text-center text-sm text-sub">보유 종목이 없습니다.</div>}
       </div>
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <TickerDetail ticker={props.selectedTicker} news={props.selectedNews} state={props.selectedNewsState} theme={props.theme} earnings={props.earnings} />
@@ -204,6 +204,37 @@ function makePriceAlerts(rows: HoldingRow[]) {
   return alerts;
 }
 
+function makeWatchPriceAlerts(watch: WatchItem[], prices: PriceMap) {
+  const threshold = 5;
+  const alerts: PriceAlert[] = [];
+  watch.forEach((item) => {
+    const price = prices[item.ticker]?.price;
+    if (!price || !item.targetBuy) return;
+    const distance = ((price - item.targetBuy) / price) * 100;
+    if (distance <= 0) {
+      alerts.push({
+        ticker: item.ticker,
+        label: '목표 진입가 도달',
+        level: 'success',
+        message: `${usd(price)}로 목표 진입가 ${usd(item.targetBuy)} 이하에 도달했습니다.`,
+      });
+    } else if (distance <= threshold) {
+      alerts.push({
+        ticker: item.ticker,
+        label: '목표 진입가 근접',
+        level: 'warning',
+        message: `목표 진입가 ${usd(item.targetBuy)}까지 ${pct(distance)} 남았습니다.`,
+      });
+    }
+  });
+  return alerts;
+}
+
+function earningsSymbolMatches(ticker: string, symbol: string) {
+  if (ticker === symbol) return true;
+  return (ticker === 'GOOGL' && symbol === 'GOOG') || (ticker === 'GOOG' && symbol === 'GOOGL');
+}
+
 function HoldingDaysBadge({ buyDate }: { buyDate?: string | null }) {
   const days = daysSince(buyDate);
   if (days === null) return null;
@@ -246,11 +277,12 @@ export function WatchView({
   onExportTradingView: () => void;
 }) {
   const watchTickers = new Set(watch.map((item) => item.ticker));
-  const watchEarnings = earnings.filter((item) => watchTickers.has(item.symbol));
+  const watchEarnings = earnings.filter((item) => Array.from(watchTickers).some((ticker) => earningsSymbolMatches(ticker, item.symbol)));
+  const alerts = makeWatchPriceAlerts(watch, prices);
   return (
     <section className="space-y-4">
       <div className="no-print flex flex-wrap gap-2">
-        <button onClick={onAdd} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">관심 티커 추가</button>
+        <button onClick={onAdd} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">관심 종목 추가</button>
         <button onClick={onExportTradingView} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">TradingView 복사</button>
       </div>
       <div className="overflow-x-auto rounded-xl border border-border bg-card">
@@ -258,8 +290,9 @@ export function WatchView({
           <thead className="bg-bg text-xs text-sub"><tr><th className="px-3 py-3 text-left">티커</th><th className="px-3 py-3 text-right">현재가</th><th className="px-3 py-3 text-right">목표 진입가</th><th className="px-3 py-3 text-right">오늘</th><th className="px-3 py-3 text-left">메모</th><th className="px-3 py-3 text-right">관리</th></tr></thead>
           <tbody>{watch.map((w) => <tr key={w.ticker} className="border-t border-border hover:bg-bg"><td className="px-3 py-3"><strong className="text-brand">{w.ticker}</strong><div className="text-xs text-sub">{w.name}</div></td><td className="px-3 py-3 text-right font-semibold">{prices[w.ticker]?.price ? usd(prices[w.ticker].price) : '-'}</td><td className="px-3 py-3 text-right">{w.targetBuy ? usd(w.targetBuy) : '-'}</td><td className={`px-3 py-3 text-right ${colorClass(prices[w.ticker]?.changePercent ?? 0)}`}>{prices[w.ticker] ? pct(prices[w.ticker].changePercent ?? 0) : '-'}</td><td className="px-3 py-3 text-sub">{w.note || '-'}</td><td className="px-3 py-3 text-right"><button onClick={() => onSelectTicker(w.ticker)} className="no-print mr-2 text-slate-700">상세</button><button onClick={() => onEdit(w)} className="no-print mr-2 text-brand">수정</button><button onClick={() => onDelete(w.ticker)} className="no-print text-rose-600">삭제</button></td></tr>)}</tbody>
         </table>
-        {!watch.length && <div className="p-12 text-center text-sm text-sub">관심 티커가 없습니다.</div>}
+        {!watch.length && <div className="p-12 text-center text-sm text-sub">관심 종목이 없습니다.</div>}
       </div>
+      <PriceAlerts alerts={alerts} />
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <TickerDetail ticker={selectedTicker} news={selectedNews} state={selectedNewsState} theme={theme} earnings={watchEarnings} />
         <EarningsPanel earnings={watchEarnings} loading={loadingEarnings} onRefresh={onRefreshEarnings} />

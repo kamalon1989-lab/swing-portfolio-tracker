@@ -91,7 +91,7 @@ export default function OpenPage() {
               {([
                 ['portfolio', '포트폴리오'],
                 ['assets', '자산 분석'],
-                ['watchlist', '관심 티커'],
+                ['watchlist', '관심 종목'],
                 ['journal', '매매 일지'],
               ] as const).map(([key, label]) => (
                 <button key={key} onClick={() => setTab(key)} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${tab === key ? 'bg-card text-brand shadow-sm' : 'text-sub hover:text-text'}`}>
@@ -181,7 +181,7 @@ export default function OpenPage() {
               onExportTradingView={() => {
                 const text = watch.map((item) => item.ticker).filter(Boolean).join(',');
                 if (!text) {
-                  notify('복사할 관심 티커가 없습니다');
+                  notify('복사할 관심 종목이 없습니다');
                   return;
                 }
                 if (!navigator.clipboard) {

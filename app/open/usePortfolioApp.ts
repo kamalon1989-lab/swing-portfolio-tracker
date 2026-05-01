@@ -311,9 +311,15 @@ export function usePortfolioApp() {
     to.setDate(now.getDate() + 21);
     const fmt = (d: Date) => d.toISOString().slice(0, 10);
     try {
-      const data = await fetchFinnhubJson('calendar/earnings', { from: fmt(from), to: fmt(to) });
-      const rows = ((data?.earningsCalendar ?? []) as EarningsItem[])
-        .filter((item) => tickers.includes(item.symbol))
+      const responses = await Promise.all(
+        tickers.flatMap((ticker) => earningsLookupSymbols(ticker).map((symbol) => (
+          fetchFinnhubJson('calendar/earnings', { from: fmt(from), to: fmt(to), symbol }).catch(() => null)
+        )))
+      );
+      const rows = responses
+        .flatMap((data) => ((data?.earningsCalendar ?? []) as EarningsItem[]))
+        .filter((item) => tickers.some((ticker) => earningsSymbolMatches(ticker, item.symbol)))
+        .filter((item, index, list) => list.findIndex((x) => x.symbol === item.symbol && x.date === item.date) === index)
         .sort((a, b) => a.date.localeCompare(b.date));
       setEarnings(rows);
       setStatus(`실적 일정 ${rows.length}건 갱신`);
@@ -387,7 +393,7 @@ export function usePortfolioApp() {
       const entry = { ...item, ticker };
       if (editingWatch) return prev.map((x) => (x.ticker === editingWatch.ticker ? entry : x));
       if (prev.some((x) => x.ticker === ticker)) {
-        notify('이미 관심 티커에 있습니다');
+        notify('이미 관심 종목에 있습니다');
         return prev;
       }
       return [...prev, entry];
@@ -481,6 +487,17 @@ export function usePortfolioApp() {
   function saveCash(nextCash: number) {
     setCash(nextCash);
     setShowCashForm(false);
+  }
+
+  function earningsLookupSymbols(ticker: string) {
+    if (ticker === 'GOOGL') return ['GOOGL', 'GOOG'];
+    if (ticker === 'GOOG') return ['GOOG', 'GOOGL'];
+    return [ticker];
+  }
+
+  function earningsSymbolMatches(ticker: string, symbol: string) {
+    if (ticker === symbol) return true;
+    return (ticker === 'GOOGL' && symbol === 'GOOG') || (ticker === 'GOOG' && symbol === 'GOOGL');
   }
 
   return {

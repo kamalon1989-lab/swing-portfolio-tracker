@@ -101,7 +101,7 @@ function Features() {
   const items = [
     {
       icon: '💼',
-      title: '보유 티커 관리',
+      title: '보유 종목 관리',
       desc: '수량·평단가·목표가·손절가를 한 곳에. 실시간 수익률과 비중 자동 계산.',
     },
     {
@@ -111,13 +111,13 @@ function Features() {
     },
     {
       icon: '👀',
-      title: '관심 티커 + TradingView 연동',
+      title: '관심 종목 + TradingView 연동',
       desc: '워치리스트를 TradingView와 양방향 동기화. 목표 진입가 도달 시 알림 표시.',
     },
     {
       icon: '📅',
       title: '실적 발표 캘린더',
-      desc: '보유·관심 티커의 어닝 일정을 자동 수집. 일정 충돌·리스크 한눈에 확인.',
+      desc: '보유·관심 종목의 어닝 일정을 자동 수집. 일정 충돌·리스크 한눈에 확인.',
     },
     {
       icon: '⏱️',
@@ -169,7 +169,7 @@ function Showcase() {
             로그인 없이 먼저 둘러보세요
           </h2>
           <p className="text-sub leading-relaxed mb-6">
-            샘플 데이터로 포트폴리오, 관심 티커, 매매 일지, 자산 분석까지
+            샘플 데이터로 포트폴리오, 관심 종목, 매매 일지, 자산 분석까지
             모든 탭을 로그인 없이 직접 탐색할 수 있습니다.
           </p>
           <ul className="space-y-2.5 text-sm mb-8">
