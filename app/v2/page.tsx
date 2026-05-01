@@ -15,7 +15,7 @@ export default function V2Redirect() {
 
         <ul className="text-sm space-y-2 pt-2">
           <li>✅ Phase 0 — HTML 핫픽스 (매수날짜, PDF, 개별 import·export, TradingView)</li>
-          <li>✅ Phase 1 — Next.js 스캐폴딩 + legacy 보존</li>
+          <li>✅ Phase 1 — Next.js 스캐폴딩 + 레거시 HTML 제거</li>
           <li>✅ Phase 2 — 랜딩 페이지 + 데모 모드 + /open URL</li>
           <li>✅ Phase 3 — Finnhub API 서버 프록시 (공용 키, 토큰 검증, edge 캐싱)</li>
           <li>✅ Phase 4 — 도메인 컷오버 (루트 정리, /v2 승격)</li>

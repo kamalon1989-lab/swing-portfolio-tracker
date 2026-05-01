@@ -1,80 +1,77 @@
 # Next.js 마이그레이션 노트
 
-## 폴더 구조
+## 현재 구조
 
 ```
 portfolio/
-├── ai_studio_code2.1.html   # 원본 (백업용으로 보존)
-├── public/legacy/index.html # 실제 서비스되는 legacy 진입점
 ├── app/
-│   ├── layout.tsx           # 루트 레이아웃
-│   ├── page.tsx             # / — rewrite로 거의 닿지 않음 (폴백)
-│   ├── v2/page.tsx          # /v2 — 새 버전 미리보기 (Phase 2부터 채움)
+│   ├── api/finnhub/[...path]/route.ts  # Finnhub 서버 프록시
+│   ├── open/                           # 실제 포트폴리오 앱
+│   ├── v2/page.tsx                     # /open 리다이렉트
+│   ├── layout.tsx
+│   ├── page.tsx                        # 랜딩 페이지
 │   └── globals.css
-├── lib/firebase.ts          # legacy와 동일한 Firebase 설정·DB 경로
-├── next.config.js           # rewrites: / → /legacy/index.html
-└── ...
+├── lib/firebase.ts                     # 기존 Firebase 프로젝트·DB 경로 호환
+├── lib/demoShare.ts                    # /open 공유 화면 데모 URL
+├── next.config.js
+└── vercel.json
 ```
 
-## 데이터 호환성 — 절대 깨면 안 되는 약속
+레거시 HTML 진입점은 제거했고, `/open`이 Next.js App Router 기반 실제 앱입니다.
 
-- Firebase 프로젝트: `swing-dh` (legacy와 동일)
+## 데이터 호환성
+
+- Firebase 프로젝트: `swing-dh`
 - RTDB 경로: `users/{uid}/ptf`
-- 데이터 키: `h`(holdings), `w`(watch), `j`(journal), `hi`(history), `c`(cash), `k`(api key — Phase 3에서 제거)
-- 보안 규칙: `$uid === auth.uid` (이미 적용됨, 변경 불요)
+- 데이터 키: `h`(holdings), `w`(watch), `j`(journal), `hi`(history), `c`(cash)
+- 보안 규칙: `$uid === auth.uid`
 
-기존 앱과 새 v2 앱이 같은 데이터를 읽고 쓰므로, 친구들이 어느 쪽을 사용해도 데이터가 보존됩니다.
+Firebase 데이터 경로와 단축 키는 기존 사용자 데이터 호환을 위해 유지합니다.
 
 ## 로컬 개발
 
 ```bash
 npm install
 npm run dev
-# http://localhost:3000  → legacy
-# http://localhost:3000/v2 → 새 버전
 ```
 
-## 배포 (Vercel)
+- 랜딩: `http://localhost:3000`
+- 앱: `http://localhost:3000/open`
+- 데모: `http://localhost:3000/open?demo=1`
 
-`package.json`이 추가되었으므로 Vercel은 자동으로 Next.js 빌드로 전환됩니다.
+## 배포
 
-1. Vercel 대시보드에서 Framework Preset이 "Next.js"로 인식되는지 확인
-2. (선택) Environment Variables에 `NEXT_PUBLIC_FIREBASE_*` 설정 — 비워두면 `lib/firebase.ts`의 기본값 사용
-3. 배포 후 확인:
-   - `/` → 기존 HTML 그대로 보여야 함
-   - `/v2` → 새 미리보기 페이지
+Vercel은 `vercel.json`의 Next.js 설정을 사용합니다.
 
-## 단계별 진행
+필수 환경변수:
 
-| Phase | 상태 | 내용 |
-|---|---|---|
-| 0 | ✅ | HTML 핫픽스 (매수날짜 동기화, PDF, 보유/관심 개별 import·export, TradingView) |
-| 1 | ✅ | Next.js 스캐폴딩 + legacy 보존 |
-| 2 | ✅ | 랜딩 페이지(#7) + 데모 모드 + /open URL |
-| 3 | ✅ | Finnhub API 서버 프록시(#8) — 공용 키, 토큰 검증, edge 캐싱 |
-| 4 | ✅ | 도메인 컷오버 (루트 index.html 제거, /v2 → /open 리다이렉트, 상태 페이지 완료 표시) |
+- `FINNHUB_API_KEY`: 시세, 뉴스, 실적 일정 서버 프록시에서 사용
 
-## Phase 3: Vercel 환경변수 설정 (필수)
+선택 환경변수:
 
-서버 프록시가 동작하려면 Vercel에 Finnhub API 키를 등록해야 합니다.
+- `NEXT_PUBLIC_FIREBASE_*`: 비워두면 `lib/firebase.ts`의 기본값 사용
 
-1. [Vercel 프로젝트 → Settings → Environment Variables](https://vercel.com/dashboard) 이동
-2. 새 변수 추가:
-   - **Name**: `FINNHUB_API_KEY`
-   - **Value**: 본인 Finnhub 계정의 API 키
-   - **Environments**: Production, Preview, Development 모두 체크
-3. 저장 후 **재배포** (Deployments → 최신 → ⋯ → Redeploy) 또는 다음 push로 자동 반영
+## 완료된 주요 개선
 
-설정이 빠진 경우 `/api/finnhub/*` 호출이 500 에러를 반환하며 본문에 안내 메시지가 들어옵니다.
+- 레거시 HTML 제거 및 `/open` Next.js 앱 이식
+- 티커 용어 통일, 입력 대문자 처리
+- 필수/선택 입력 표시
+- 목표가/손절가 상태 배지
+- 실적 일정 자동 로드, 지난 7일~향후 3주 범위, BEAT/MISS 표시
+- 상세 패널 확장: 보유 요약, 목표/손절 거리, 가까운 실적, 뉴스, TradingView 링크
+- 다크 모드
+- 예수금 팝업 수정
+- 공유 링크 표시 잔류 제거
+- 보유 티커 테이블 정렬
+- 백업 JSON 불러오기 UI 제거
+- 공유 요약 기반 PDF 내보내기
+- 자산 비중 도넛 그래프, 자산 추이 그래프, 변화율 표시
+- 관심 티커 탭 실적 일정 추가
+- 매수/매도 색상 구분
 
-### 보안 모델
-- 클라이언트는 자기 Firebase ID 토큰을 `Authorization: Bearer ...` 헤더로 보냄
-- 서버가 Google JWKS로 서명 검증 (admin SDK 불필요, `jose` 라이브러리 사용)
-- 검증 통과 시에만 Finnhub로 forward, 응답은 Vercel CDN에 짧게 캐시 (시세 30s, 뉴스 5m, 어닝 30m)
-- API 키는 서버 환경변수에만 존재, 응답 본문/헤더 어디에도 노출 안 됨
+## 보안 모델
 
-## 롤백 방법
-
-문제 발생 시:
-1. `next.config.js`의 rewrites는 그대로 두고 `app/`, `lib/`, `public/legacy/` 외 새 파일만 제거하면 legacy로 100% 복귀
-2. 가장 강한 롤백: `package.json`, `next.config.js`, `app/`, `lib/`, `public/`을 모두 삭제하고 root에 `ai_studio_code2.1.html`만 두면 원래 정적 사이트로 돌아감
+- 클라이언트는 Firebase ID 토큰을 `Authorization: Bearer ...` 헤더로 전송
+- 서버가 Google JWKS로 토큰 서명 검증
+- 검증 통과 시에만 Finnhub로 forward
+- Finnhub API 키는 서버 환경변수에만 존재

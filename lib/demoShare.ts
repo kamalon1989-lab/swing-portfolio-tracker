@@ -1,5 +1,5 @@
 // 데모 둘러보기용 share 페이로드.
-// legacy의 showShareView()가 받는 base64-url 인코딩 형식과 동일.
+// /open 공유 화면이 받는 base64-url 인코딩 형식과 동일.
 // 새 데모 데이터를 추가하고 싶으면 demoPayload만 바꾸면 됨.
 
 const demoPayload = {
@@ -24,4 +24,4 @@ function toUrlSafeBase64(input: string): string {
 }
 
 export const demoShareHash = toUrlSafeBase64(JSON.stringify(demoPayload));
-export const demoShareUrl = `/legacy/index.html#share=${demoShareHash}`;
+export const demoShareUrl = `/open#share=${demoShareHash}`;

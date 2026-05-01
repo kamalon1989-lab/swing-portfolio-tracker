@@ -48,6 +48,7 @@ export function usePortfolioApp() {
   const [cash, setCash] = useState(0);
   const [prices, setPrices] = useState<PriceMap>({});
   const [krw, setKrw] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [rate, setRate] = useState(0);
   const [status, setStatus] = useState('대기 중');
   const [loadingPrices, setLoadingPrices] = useState(false);
@@ -58,15 +59,14 @@ export function usePortfolioApp() {
   const [showHoldingForm, setShowHoldingForm] = useState(false);
   const [showWatchForm, setShowWatchForm] = useState(false);
   const [showTradeForm, setShowTradeForm] = useState(false);
-  const [cashDraft, setCashDraft] = useState('0');
-  const [importDraft, setImportDraft] = useState('');
-  const [shareUrl, setShareUrl] = useState('');
+  const [showCashForm, setShowCashForm] = useState(false);
   const [selectedTicker, setSelectedTicker] = useState('');
   const [news, setNews] = useState<Record<string, NewsItem[]>>({});
   const [newsState, setNewsState] = useState<Record<string, NewsState>>({});
   const [earnings, setEarnings] = useState<EarningsItem[]>([]);
   const [loadingEarnings, setLoadingEarnings] = useState(false);
   const [sharePayload, setSharePayload] = useState<SharePayload | null>(null);
+  const [pdfPayload, setPdfPayload] = useState<SharePayload | null>(null);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cloudLoaded = useRef(false);
 
@@ -105,6 +105,7 @@ export function usePortfolioApp() {
     setCash(readJson<number>(K.cash, 0));
     setPrices(readJson<PriceMap>(K.prices, {}));
     setKrw(readJson<boolean>(K.krw, false));
+    setTheme(readJson<'light' | 'dark'>(K.theme, 'light'));
     setReady(true);
 
     const unsub = onAuthStateChanged(getFirebaseAuth(), async (nextUser) => {
@@ -139,6 +140,25 @@ export function usePortfolioApp() {
   }, []);
 
   useEffect(() => {
+    if (!ready) return;
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    if (!demo) writeJson(K.theme, theme);
+  }, [demo, ready, theme]);
+
+  useEffect(() => {
+    fetch('https://open.er-api.com/v6/latest/USD')
+      .then((r) => r.json())
+      .then((d) => setRate(d.rates.KRW || 0))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!ready || sharePayload) return;
+    if (demo || user) refreshEarnings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, demo, user, holdings.length, watch.length, sharePayload]);
+
+  useEffect(() => {
     if (!ready || demo) return;
     writeJson(K.holdings, holdings);
     writeJson(K.watch, watch);
@@ -148,6 +168,13 @@ export function usePortfolioApp() {
     writeJson(K.prices, prices);
     writeJson(K.krw, krw);
   }, [ready, demo, holdings, watch, journal, history, cash, prices, krw]);
+
+  useEffect(() => {
+    if (!pdfPayload) return;
+    const clear = () => setPdfPayload(null);
+    window.addEventListener('afterprint', clear);
+    return () => window.removeEventListener('afterprint', clear);
+  }, [pdfPayload]);
 
   useEffect(() => {
     if (!user || demo || !cloudLoaded.current) return;
@@ -207,6 +234,12 @@ export function usePortfolioApp() {
     };
   }, [rows, cash, prices]);
 
+  const portfolioSummaryPayload = useMemo<SharePayload>(() => ({
+    date: today(),
+    pnl: summary.totalPnlPct,
+    rows: rows.map((r) => ({ t: r.ticker, n: r.name, pnl: r.pnlPct, w: r.weight })),
+  }), [rows, summary.totalPnlPct]);
+
   async function refreshPrices() {
     if (demo) {
       setPrices(demoPrices);
@@ -261,9 +294,10 @@ export function usePortfolioApp() {
   async function refreshEarnings() {
     if (demo) {
       setEarnings([
+        { symbol: 'GOOGL', date: '2026-04-25', hour: 'amc', epsEstimate: 2.12, epsActual: 2.28, revenueEstimate: 96500000000, revenueActual: 98200000000 },
+        { symbol: 'AMD', date: '2026-05-06', hour: 'amc', epsEstimate: 0.94, revenueEstimate: 7400000000 },
         { symbol: 'NVDA', date: '2026-05-21', hour: 'amc', epsEstimate: 5.58, revenueEstimate: 44000000000 },
         { symbol: 'MSFT', date: '2026-05-28', hour: 'amc', epsEstimate: 3.24, revenueEstimate: 69000000000 },
-        { symbol: 'AMD', date: '2026-05-06', hour: 'amc', epsEstimate: 0.94, revenueEstimate: 7400000000 },
       ]);
       return;
     }
@@ -326,7 +360,7 @@ export function usePortfolioApp() {
   function saveHolding(item: HoldingItem) {
     const ticker = normalizeTicker(item.ticker);
     if (!ticker || !item.shares || !item.avgCost) {
-      notify('종목, 수량, 평단가는 필수입니다');
+      notify('티커, 수량, 평단가는 필수입니다');
       return;
     }
     setHoldings((prev) => {
@@ -334,7 +368,7 @@ export function usePortfolioApp() {
       const exists = prev.some((x) => x.ticker === ticker);
       if (editingHolding) return prev.map((x) => (x.ticker === editingHolding.ticker ? { ...x, ...entry, buyDate: entry.buyDate || x.buyDate } : x));
       if (exists) {
-        notify('이미 보유 중인 종목입니다');
+        notify('이미 보유 중인 티커입니다');
         return prev;
       }
       return [...prev, entry];
@@ -346,14 +380,14 @@ export function usePortfolioApp() {
   function saveWatch(item: WatchItem) {
     const ticker = normalizeTicker(item.ticker);
     if (!ticker) {
-      notify('종목 코드를 입력해주세요');
+      notify('티커를 입력해주세요');
       return;
     }
     setWatch((prev) => {
       const entry = { ...item, ticker };
       if (editingWatch) return prev.map((x) => (x.ticker === editingWatch.ticker ? entry : x));
       if (prev.some((x) => x.ticker === ticker)) {
-        notify('이미 관심 종목에 있습니다');
+        notify('이미 관심 티커에 있습니다');
         return prev;
       }
       return [...prev, entry];
@@ -365,7 +399,7 @@ export function usePortfolioApp() {
   function saveTrade(item: JournalItem, syncHolding: boolean) {
     const trade = { ...item, ticker: normalizeTicker(item.ticker), id: item.id || uid() };
     if (!trade.ticker || !trade.shares || !trade.price) {
-      notify('종목, 수량, 단가는 필수입니다');
+      notify('티커, 수량, 단가는 필수입니다');
       return;
     }
     if (syncHolding && !editingTrade) {
@@ -421,42 +455,19 @@ export function usePortfolioApp() {
     URL.revokeObjectURL(url);
   }
 
-  function applyImport() {
-    try {
-      const data = JSON.parse(importDraft) as LegacyPortfolio & {
-        holdings?: HoldingItem[];
-        watch?: WatchItem[];
-        journal?: JournalItem[];
-        history?: HistoryEntry[];
-        cash?: number;
-      };
-      setHoldings(data.h ?? data.holdings ?? []);
-      setWatch(data.w ?? data.watch ?? []);
-      setJournal(data.j ?? data.journal ?? []);
-      setHistory(normalizeHistory(data.hi ?? data.history));
-      setCash(data.c ?? data.cash ?? 0);
-      setImportDraft('');
-      notify('백업을 불러왔습니다');
-    } catch {
-      notify('올바른 JSON이 아닙니다');
-    }
-  }
-
   function makeShareUrl() {
-    const payload = {
-      date: today(),
-      pnl: summary.totalPnlPct,
-      rows: rows.map((r) => ({ t: r.ticker, n: r.name, pnl: r.pnlPct, w: r.weight })),
-    };
-    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(portfolioSummaryPayload)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     const url = `${window.location.origin}/open#share=${encoded}`;
-    setShareUrl(url);
-    navigator.clipboard?.writeText(url).catch(() => undefined);
-    notify('공유 링크를 만들었습니다');
+    if (!navigator.clipboard) {
+      notify(url);
+      return;
+    }
+    navigator.clipboard.writeText(url).then(() => notify('공유 링크를 복사했습니다')).catch(() => notify(url));
   }
 
-  function printPortfolio() {
-    window.print();
+  function exportPdfReport() {
+    setPdfPayload(portfolioSummaryPayload);
+    window.setTimeout(() => window.print(), 100);
   }
 
   function signInWithGoogle() {
@@ -465,6 +476,11 @@ export function usePortfolioApp() {
 
   function signOutCurrent() {
     return signOut(getFirebaseAuth());
+  }
+
+  function saveCash(nextCash: number) {
+    setCash(nextCash);
+    setShowCashForm(false);
   }
 
   return {
@@ -485,6 +501,8 @@ export function usePortfolioApp() {
     prices,
     krw,
     setKrw,
+    theme,
+    setTheme,
     rate,
     status,
     loadingPrices,
@@ -501,17 +519,16 @@ export function usePortfolioApp() {
     setShowWatchForm,
     showTradeForm,
     setShowTradeForm,
-    cashDraft,
-    setCashDraft,
-    importDraft,
-    setImportDraft,
-    shareUrl,
+    showCashForm,
+    setShowCashForm,
     selectedTicker,
     news,
     newsState,
     earnings,
     loadingEarnings,
     sharePayload,
+    pdfPayload,
+    setPdfPayload,
     rows,
     summary,
     notify,
@@ -521,11 +538,11 @@ export function usePortfolioApp() {
     saveHolding,
     saveWatch,
     saveTrade,
+    saveCash,
     recordToday,
     exportBackup,
-    applyImport,
     makeShareUrl,
-    printPortfolio,
+    exportPdfReport,
     signInWithGoogle,
     signOutCurrent,
   };

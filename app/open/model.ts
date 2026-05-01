@@ -18,12 +18,31 @@ export type EarningsItem = {
   date: string;
   hour?: string;
   epsEstimate?: number;
+  epsActual?: number;
   revenueEstimate?: number;
+  revenueActual?: number;
 };
 export type SharePayload = {
   date: string;
   pnl: number;
   rows: Array<{ t: string; n?: string; pnl: number; w: number }>;
+};
+
+export type TickerDetailData = {
+  ticker: string;
+  name?: string;
+  price?: number;
+  shares?: number;
+  avgCost?: number;
+  value?: number;
+  pnl?: number;
+  pnlPct?: number;
+  dayPct?: number;
+  weight?: number;
+  targetPrice?: number;
+  stopLoss?: number;
+  targetBuy?: number;
+  note?: string;
 };
 
 export const K = {

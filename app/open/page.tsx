@@ -1,7 +1,7 @@
 'use client';
 
-import { HoldingForm, TradeForm, WatchForm } from './forms';
-import { AssetsView, MobileTabs, ShareView } from './panels';
+import { CashForm, HoldingForm, TradeForm, WatchForm } from './forms';
+import { AssetsView, MobileTabs, PortfolioPdfReport, ShareView } from './panels';
 import { JournalView, PortfolioView, WatchView } from './views';
 import { usePortfolioApp } from './usePortfolioApp';
 
@@ -20,10 +20,11 @@ export default function OpenPage() {
     setJournal,
     history,
     cash,
-    setCash,
     prices,
     krw,
     setKrw,
+    theme,
+    setTheme,
     rate,
     status,
     loadingPrices,
@@ -40,17 +41,15 @@ export default function OpenPage() {
     setShowWatchForm,
     showTradeForm,
     setShowTradeForm,
-    cashDraft,
-    setCashDraft,
-    importDraft,
-    setImportDraft,
-    shareUrl,
+    showCashForm,
+    setShowCashForm,
     selectedTicker,
     news,
     newsState,
     earnings,
     loadingEarnings,
     sharePayload,
+    pdfPayload,
     rows,
     summary,
     notify,
@@ -60,11 +59,11 @@ export default function OpenPage() {
     saveHolding,
     saveWatch,
     saveTrade,
+    saveCash,
     recordToday,
     exportBackup,
-    applyImport,
     makeShareUrl,
-    printPortfolio,
+    exportPdfReport,
     signInWithGoogle,
     signOutCurrent,
   } = app;
@@ -76,7 +75,8 @@ export default function OpenPage() {
   const signedIn = demo || user;
 
   return (
-    <main className="min-h-screen bg-bg text-text">
+    <>
+    <main className="min-h-screen bg-bg text-text print:hidden">
       {toast && <div className="fixed right-5 top-5 z-50 rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-lg">{toast.message}</div>}
       {demo && (
         <div className="bg-amber-500 px-4 py-2 text-center text-sm font-semibold text-white">
@@ -91,7 +91,7 @@ export default function OpenPage() {
               {([
                 ['portfolio', '포트폴리오'],
                 ['assets', '자산 분석'],
-                ['watchlist', '관심 종목'],
+                ['watchlist', '관심 티커'],
                 ['journal', '매매 일지'],
               ] as const).map(([key, label]) => (
                 <button key={key} onClick={() => setTab(key)} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${tab === key ? 'bg-card text-brand shadow-sm' : 'text-sub hover:text-text'}`}>
@@ -105,6 +105,9 @@ export default function OpenPage() {
             {signedIn && (
               <>
                 <button onClick={() => setKrw((v) => !v)} className={`rounded-md border px-3 py-1.5 text-sm font-semibold ${krw ? 'border-brand bg-brand/10 text-brand' : 'border-border text-sub'}`}>원화</button>
+                <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub">
+                  {theme === 'dark' ? '라이트' : '다크'}
+                </button>
                 <button onClick={refreshPrices} className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60" disabled={loadingPrices}>
                   {loadingPrices ? '조회 중' : '시세 갱신'}
                 </button>
@@ -139,32 +142,27 @@ export default function OpenPage() {
               rows={rows}
               summary={summary}
               cash={cash}
-              cashDraft={cashDraft}
-              setCashDraft={setCashDraft}
-              setCash={setCash}
               krw={krw}
               rate={rate}
+              onEditCash={() => setShowCashForm(true)}
               onAdd={() => { setEditingHolding(null); setShowHoldingForm(true); }}
               onEdit={(item) => { setEditingHolding(item); setShowHoldingForm(true); }}
               onDelete={(ticker) => setHoldings((prev) => prev.filter((x) => x.ticker !== ticker))}
               onRecord={recordToday}
               onShare={makeShareUrl}
-              shareUrl={shareUrl}
+              onPdf={exportPdfReport}
               onExport={exportBackup}
-              importDraft={importDraft}
-              setImportDraft={setImportDraft}
-              onImport={applyImport}
               selectedTicker={selectedTicker}
               onSelectTicker={openTickerDetail}
               selectedNews={selectedTicker ? news[selectedTicker] ?? [] : []}
               selectedNewsState={selectedTicker ? newsState[selectedTicker] ?? 'idle' : 'idle'}
+              theme={theme}
               earnings={earnings}
               loadingEarnings={loadingEarnings}
               onRefreshEarnings={refreshEarnings}
-              onPrint={printPortfolio}
             />
           )}
-          {tab === 'assets' && <AssetsView history={history} summary={summary} cash={cash} krw={krw} rate={rate} />}
+          {tab === 'assets' && <AssetsView history={history} rows={rows} summary={summary} cash={cash} krw={krw} rate={rate} />}
           {tab === 'watchlist' && (
             <WatchView
               watch={watch}
@@ -176,9 +174,21 @@ export default function OpenPage() {
               selectedTicker={selectedTicker}
               selectedNews={selectedTicker ? news[selectedTicker] ?? [] : []}
               selectedNewsState={selectedTicker ? newsState[selectedTicker] ?? 'idle' : 'idle'}
+              theme={theme}
+              earnings={earnings}
+              loadingEarnings={loadingEarnings}
+              onRefreshEarnings={refreshEarnings}
               onExportTradingView={() => {
                 const text = watch.map((item) => item.ticker).filter(Boolean).join(',');
-                navigator.clipboard?.writeText(text).then(() => notify('TradingView 형식을 복사했습니다')).catch(() => notify(text || '복사할 관심 종목이 없습니다'));
+                if (!text) {
+                  notify('복사할 관심 티커가 없습니다');
+                  return;
+                }
+                if (!navigator.clipboard) {
+                  notify(text);
+                  return;
+                }
+                navigator.clipboard.writeText(text).then(() => notify('TradingView 형식을 복사했습니다')).catch(() => notify(text));
               }}
             />
           )}
@@ -196,6 +206,9 @@ export default function OpenPage() {
       {showHoldingForm && <HoldingForm item={editingHolding} onClose={() => setShowHoldingForm(false)} onSave={saveHolding} />}
       {showWatchForm && <WatchForm item={editingWatch} onClose={() => setShowWatchForm(false)} onSave={saveWatch} />}
       {showTradeForm && <TradeForm item={editingTrade} onClose={() => setShowTradeForm(false)} onSave={saveTrade} />}
+      {showCashForm && <CashForm cash={cash} onClose={() => setShowCashForm(false)} onSave={saveCash} />}
     </main>
+    {pdfPayload && <PortfolioPdfReport payload={pdfPayload} />}
+    </>
   );
 }

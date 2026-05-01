@@ -101,7 +101,7 @@ function Features() {
   const items = [
     {
       icon: '💼',
-      title: '보유 종목 관리',
+      title: '보유 티커 관리',
       desc: '수량·평단가·목표가·손절가를 한 곳에. 실시간 수익률과 비중 자동 계산.',
     },
     {
@@ -111,13 +111,13 @@ function Features() {
     },
     {
       icon: '👀',
-      title: '관심 종목 + TradingView 연동',
+      title: '관심 티커 + TradingView 연동',
       desc: '워치리스트를 TradingView와 양방향 동기화. 목표 진입가 도달 시 알림 표시.',
     },
     {
       icon: '📅',
       title: '실적 발표 캘린더',
-      desc: '보유·관심 종목의 어닝 일정을 자동 수집. 일정 충돌·리스크 한눈에 확인.',
+      desc: '보유·관심 티커의 어닝 일정을 자동 수집. 일정 충돌·리스크 한눈에 확인.',
     },
     {
       icon: '⏱️',
@@ -169,14 +169,14 @@ function Showcase() {
             로그인 없이 먼저 둘러보세요
           </h2>
           <p className="text-sub leading-relaxed mb-6">
-            샘플 데이터로 포트폴리오, 관심 종목, 매매 일지, 자산 분석까지
+            샘플 데이터로 포트폴리오, 관심 티커, 매매 일지, 자산 분석까지
             모든 탭을 로그인 없이 직접 탐색할 수 있습니다.
           </p>
           <ul className="space-y-2.5 text-sm mb-8">
             {[
               'Google 계정 외 별도 가입 절차 없음',
               '본인 데이터는 Firebase에서 본인 UID로만 접근',
-              '백업/복원 자유 — 언제든 JSON으로 내보내고 가져오기',
+              '백업 저장과 공유 링크, PDF 내보내기까지 한 화면에서 처리',
               '친구가 만든 포트폴리오를 AI에게 정리시켜 그대로 가져올 수 있는 포맷 제공',
             ].map((x) => (
               <li key={x} className="flex items-start gap-2">
@@ -208,7 +208,7 @@ function Showcase() {
                 <div className="text-xs text-sub mt-1">총 수익률</div>
               </div>
               <div className="text-center flex-1 border-l border-border">
-                <div className="text-2xl font-extrabold">8 종목</div>
+                <div className="text-2xl font-extrabold">8 티커</div>
                 <div className="text-xs text-sub mt-1">보유 중</div>
               </div>
             </div>
