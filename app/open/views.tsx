@@ -5,6 +5,7 @@ import type { HoldingItem, JournalItem, WatchItem } from '@/lib/firebase';
 import { EarningsPanel, TickerDetail } from './panels';
 import {
   colorClass,
+  daysSince,
   money,
   pct,
   usd,
@@ -26,6 +27,8 @@ type HoldingRow = HoldingItem & {
 
 type SortKey = 'ticker' | 'price' | 'shares' | 'avgCost' | 'value' | 'pnl' | 'pnlPct' | 'dayPct' | 'weight';
 type SortDir = 'asc' | 'desc';
+type AlertLevel = 'danger' | 'warning' | 'success';
+type PriceAlert = { ticker: string; label: string; message: string; level: AlertLevel };
 
 export function PortfolioView(props: {
   rows: HoldingRow[];
@@ -70,7 +73,7 @@ export function PortfolioView(props: {
     }
   };
   const sortMark = (key: SortKey) => sortKey === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
-  const selectedDetail = props.rows.find((row) => row.ticker === props.selectedTicker);
+  const alerts = makePriceAlerts(props.rows);
   const cards = [
     ['주식 평가금액', money(props.summary.stockValue, props.krw, props.rate), `매수 ${money(props.summary.totalCost, props.krw, props.rate)}`, 'text-brand'],
     ['누적 손익', money(props.summary.totalPnl, props.krw, props.rate), pct(props.summary.totalPnlPct), colorClass(props.summary.totalPnl)],
@@ -96,6 +99,7 @@ export function PortfolioView(props: {
         <button onClick={props.onPdf} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">PDF 내보내기</button>
         <button onClick={props.onExport} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">백업 저장</button>
       </div>
+      <PriceAlerts alerts={alerts} />
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
         <table className="w-full min-w-[860px] text-sm">
           <thead className="bg-bg text-xs text-sub">
@@ -116,7 +120,13 @@ export function PortfolioView(props: {
           <tbody>
             {sortedRows.map((r) => (
               <tr key={r.ticker} className="border-t border-border hover:bg-bg">
-                <td className="px-3 py-3 text-left"><strong className="text-brand">{r.ticker}</strong><div className="text-xs text-sub">{r.name}</div></td>
+                <td className="px-3 py-3 text-left">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <strong className="text-brand">{r.ticker}</strong>
+                    <HoldingDaysBadge buyDate={r.buyDate || r.lastBuyDate} />
+                  </div>
+                  <div className="text-xs text-sub">{r.name}</div>
+                </td>
                 <td className="px-3 py-3 text-right font-semibold">{r.price ? usd(r.price) : '-'}</td>
                 <td className="px-3 py-3 text-right">{r.shares}</td>
                 <td className="px-3 py-3 text-right text-sub">{usd(r.avgCost)}</td>
@@ -138,10 +148,69 @@ export function PortfolioView(props: {
         {!props.rows.length && <div className="p-12 text-center text-sm text-sub">보유 티커가 없습니다.</div>}
       </div>
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <TickerDetail ticker={props.selectedTicker} news={props.selectedNews} state={props.selectedNewsState} theme={props.theme} detail={selectedDetail} earnings={props.earnings} />
+        <TickerDetail ticker={props.selectedTicker} news={props.selectedNews} state={props.selectedNewsState} theme={props.theme} earnings={props.earnings} />
         <EarningsPanel earnings={props.earnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
       </div>
     </section>
+  );
+}
+
+function PriceAlerts({ alerts }: { alerts: PriceAlert[] }) {
+  if (!alerts.length) return null;
+  return (
+    <section className="grid gap-2 md:grid-cols-2">
+      {alerts.map((alert) => (
+        <button
+          key={`${alert.ticker}-${alert.label}`}
+          type="button"
+          className={`rounded-xl border px-4 py-3 text-left shadow-sm ${
+            alert.level === 'danger'
+              ? 'border-rose-200 bg-rose-50 text-rose-800'
+              : alert.level === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : 'border-amber-200 bg-amber-50 text-amber-800'
+          }`}
+        >
+          <div className="text-xs font-bold">{alert.ticker} · {alert.label}</div>
+          <div className="mt-1 text-sm font-semibold">{alert.message}</div>
+        </button>
+      ))}
+    </section>
+  );
+}
+
+function makePriceAlerts(rows: HoldingRow[]) {
+  const threshold = 5;
+  const alerts: PriceAlert[] = [];
+  rows.forEach((row) => {
+    if (!row.price) return;
+    if (row.targetPrice) {
+      const distance = ((row.targetPrice - row.price) / row.price) * 100;
+      if (distance <= 0) {
+        alerts.push({ ticker: row.ticker, label: '목표가', level: 'success', message: `${usd(row.price)}로 목표가 ${usd(row.targetPrice)}를 초과했습니다.` });
+      } else if (distance <= threshold) {
+        alerts.push({ ticker: row.ticker, label: '목표가 근접', level: 'warning', message: `목표가 ${usd(row.targetPrice)}까지 ${pct(distance)} 남았습니다.` });
+      }
+    }
+    if (row.stopLoss) {
+      const distance = ((row.price - row.stopLoss) / row.price) * 100;
+      if (distance <= 0) {
+        alerts.push({ ticker: row.ticker, label: '손절가', level: 'danger', message: `${usd(row.price)}로 손절가 ${usd(row.stopLoss)}를 이탈했습니다.` });
+      } else if (distance <= threshold) {
+        alerts.push({ ticker: row.ticker, label: '손절가 근접', level: 'warning', message: `손절가 ${usd(row.stopLoss)}까지 ${pct(distance)} 여유입니다.` });
+      }
+    }
+  });
+  return alerts;
+}
+
+function HoldingDaysBadge({ buyDate }: { buyDate?: string | null }) {
+  const days = daysSince(buyDate);
+  if (days === null) return null;
+  return (
+    <span className="rounded-full bg-bg px-2 py-0.5 text-[11px] font-bold text-sub">
+      D+{String(days).padStart(2, '0')}
+    </span>
   );
 }
 
@@ -178,16 +247,6 @@ export function WatchView({
 }) {
   const watchTickers = new Set(watch.map((item) => item.ticker));
   const watchEarnings = earnings.filter((item) => watchTickers.has(item.symbol));
-  const selectedWatch = watch.find((item) => item.ticker === selectedTicker);
-  const selectedPrice = selectedTicker ? prices[selectedTicker] : undefined;
-  const selectedDetail = selectedWatch ? {
-    ticker: selectedWatch.ticker,
-    name: selectedWatch.name,
-    price: selectedPrice?.price,
-    dayPct: selectedPrice?.changePercent,
-    targetBuy: selectedWatch.targetBuy,
-    note: selectedWatch.note,
-  } : undefined;
   return (
     <section className="space-y-4">
       <div className="no-print flex flex-wrap gap-2">
@@ -202,7 +261,7 @@ export function WatchView({
         {!watch.length && <div className="p-12 text-center text-sm text-sub">관심 티커가 없습니다.</div>}
       </div>
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <TickerDetail ticker={selectedTicker} news={selectedNews} state={selectedNewsState} theme={theme} detail={selectedDetail} earnings={watchEarnings} />
+        <TickerDetail ticker={selectedTicker} news={selectedNews} state={selectedNewsState} theme={theme} earnings={watchEarnings} />
         <EarningsPanel earnings={watchEarnings} loading={loadingEarnings} onRefresh={onRefreshEarnings} />
       </div>
     </section>

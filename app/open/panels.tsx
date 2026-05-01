@@ -11,15 +11,15 @@ import {
   type NewsState,
   type SharePayload,
   type Tab,
-  type TickerDetailData,
 } from './model';
 
 type AssetRow = {
   ticker: string;
   name?: string;
   value: number;
-  weight: number;
 };
+
+type DonutRow = AssetRow & { weight: number };
 
 const chartColors = ['#2563eb', '#16a34a', '#dc2626', '#7c3aed', '#f59e0b', '#0891b2', '#be185d'];
 
@@ -107,7 +107,18 @@ export function AssetsView({
   krw: boolean;
   rate: number;
 }) {
-  const stockRatio = summary.totalAsset ? (summary.stockValue / summary.totalAsset) * 100 : 0;
+  const donutRows: DonutRow[] = [
+    ...rows.map((row) => ({
+      ...row,
+      weight: summary.totalAsset ? (row.value / summary.totalAsset) * 100 : 0,
+    })),
+    {
+      ticker: 'CASH',
+      name: '예수금',
+      value: cash,
+      weight: summary.totalAsset ? (cash / summary.totalAsset) * 100 : 0,
+    },
+  ].filter((row) => row.value > 0);
   const sortedHistory = [...history].sort((a, b) => a.date.localeCompare(b.date));
   return (
     <section className="grid gap-4 lg:grid-cols-[1fr_380px]">
@@ -139,14 +150,17 @@ export function AssetsView({
       <div className="rounded-xl border border-border bg-card p-4">
         <h2 className="font-bold">자산 비중</h2>
         <div className="mt-4 flex justify-center">
-          <AssetDonut rows={rows} stockRatio={stockRatio} />
+          <AssetDonut rows={donutRows} totalAsset={summary.totalAsset} krw={krw} rate={rate} />
         </div>
         <div className="mt-5 space-y-2 text-sm">
-          {rows.map((row, index) => (
+          {donutRows.map((row, index) => (
             <div key={row.ticker} className="flex items-center justify-between gap-3">
               <span className="flex min-w-0 items-center gap-2">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: chartColors[index % chartColors.length] }} />
-                <span className="truncate text-sub">{row.ticker}</span>
+                <span className="min-w-0">
+                  <span className="font-bold text-text">{row.ticker}</span>
+                  {row.name && <span className="ml-1 text-xs text-sub">{row.name}</span>}
+                </span>
               </span>
               <strong>{row.weight.toFixed(1)}%</strong>
             </div>
@@ -160,7 +174,7 @@ export function AssetsView({
   );
 }
 
-function AssetDonut({ rows, stockRatio }: { rows: AssetRow[]; stockRatio: number }) {
+function AssetDonut({ rows, totalAsset, krw, rate }: { rows: DonutRow[]; totalAsset: number; krw: boolean; rate: number }) {
   if (!rows.length) {
     return (
       <div className="grid h-48 w-48 place-items-center rounded-full bg-bg text-center text-sm font-bold text-sub">
@@ -179,10 +193,25 @@ function AssetDonut({ rows, stockRatio }: { rows: AssetRow[]; stockRatio: number
     <div className="relative h-52 w-52 rounded-full" style={{ background: `conic-gradient(${segments.join(', ')})` }}>
       <div className="absolute inset-10 grid place-items-center rounded-full bg-card text-center">
         <div>
-          <div className="text-xs text-sub">주식 비중</div>
-          <div className="text-2xl font-extrabold text-brand">{stockRatio.toFixed(1)}%</div>
+          <div className="text-xs text-sub">총 자산</div>
+          <div className="text-lg font-extrabold text-brand">{money(totalAsset, krw, rate)}</div>
         </div>
       </div>
+      {rows.slice(0, 5).map((row, index) => {
+        const angle = rows.slice(0, index).reduce((sum, item) => sum + item.weight, 0) + row.weight / 2;
+        const rad = (angle / 100) * Math.PI * 2 - Math.PI / 2;
+        const x = 50 + Math.cos(rad) * 39;
+        const y = 50 + Math.sin(rad) * 39;
+        return (
+          <span
+            key={row.ticker}
+            className="absolute -translate-x-1/2 -translate-y-1/2 rounded bg-card/90 px-1.5 py-0.5 text-[10px] font-bold shadow-sm"
+            style={{ left: `${x}%`, top: `${y}%` }}
+          >
+            {row.ticker}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -198,14 +227,15 @@ function AssetTrendChart({ history, krw, rate }: { history: HistoryEntry[]; krw:
   }
   const width = 720;
   const height = 240;
-  const padding = 28;
+  const paddingX = 72;
+  const paddingY = 28;
   const values = history.flatMap((item) => [item.totalValue, item.stockValue, item.cashValue]);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min || 1;
   const point = (value: number, index: number) => {
-    const x = padding + (index / Math.max(history.length - 1, 1)) * (width - padding * 2);
-    const y = height - padding - ((value - min) / span) * (height - padding * 2);
+    const x = paddingX + (index / Math.max(history.length - 1, 1)) * (width - paddingX - paddingY);
+    const y = height - paddingY - ((value - min) / span) * (height - paddingY * 2);
     return `${x},${y}`;
   };
   const makePoints = (key: 'totalValue' | 'stockValue' | 'cashValue') => history.map((item, index) => point(item[key], index)).join(' ');
@@ -225,8 +255,14 @@ function AssetTrendChart({ history, krw, rate }: { history: HistoryEntry[]; krw:
       <div className="mt-4 overflow-x-auto">
         <svg viewBox={`0 0 ${width} ${height}`} className="h-64 min-w-[620px] rounded-lg bg-bg">
           {[0, 1, 2, 3].map((line) => {
-            const y = padding + line * ((height - padding * 2) / 3);
-            return <line key={line} x1={padding} x2={width - padding} y1={y} y2={y} stroke="rgb(var(--border))" strokeWidth="1" />;
+            const y = paddingY + line * ((height - paddingY * 2) / 3);
+            const value = max - (line / 3) * span;
+            return (
+              <g key={line}>
+                <text x="12" y={y + 4} className="fill-sub text-[11px]">{money(value, krw, rate)}</text>
+                <line x1={paddingX} x2={width - paddingY} y1={y} y2={y} stroke="rgb(var(--border))" strokeWidth="1" />
+              </g>
+            );
           })}
           <polyline points={makePoints('totalValue')} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           <polyline points={makePoints('stockValue')} fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -247,14 +283,12 @@ export function TickerDetail({
   news,
   state = 'idle',
   theme = 'light',
-  detail,
   earnings = [],
 }: {
   ticker: string;
   news: NewsItem[];
   state?: NewsState;
   theme?: 'light' | 'dark';
-  detail?: TickerDetailData;
   earnings?: EarningsItem[];
 }) {
   if (!ticker) {
@@ -281,7 +315,7 @@ export function TickerDetail({
       <div className="grid gap-0 lg:grid-cols-[1fr_340px]">
         <iframe title={`${ticker} TradingView chart`} src={chartUrl} className="h-[360px] w-full border-0" loading="lazy" />
         <div className="border-t border-border p-4 lg:border-l lg:border-t-0">
-          <TickerSnapshot detail={detail} earnings={earnings} />
+          <TickerEarningsSummary ticker={ticker} earnings={earnings} />
           <h3 className="mt-5 text-sm font-bold">최근 뉴스</h3>
           <div className="mt-3 space-y-3">
             {state === 'loading' && <div className="rounded-lg bg-bg p-4 text-sm text-sub">최근 뉴스를 불러오는 중입니다.</div>}
@@ -300,68 +334,18 @@ export function TickerDetail({
   );
 }
 
-function TickerSnapshot({ detail, earnings }: { detail?: TickerDetailData; earnings: EarningsItem[] }) {
-  if (!detail) {
-    return <div className="rounded-lg bg-bg p-4 text-sm text-sub">선택한 티커의 보유 정보가 없습니다.</div>;
-  }
-  const targetDistance = detail.price && detail.targetPrice ? ((detail.targetPrice - detail.price) / detail.price) * 100 : null;
-  const stopDistance = detail.price && detail.stopLoss ? ((detail.stopLoss - detail.price) / detail.price) * 100 : null;
-  const buyDistance = detail.price && detail.targetBuy ? ((detail.targetBuy - detail.price) / detail.price) * 100 : null;
+function TickerEarningsSummary({ ticker, earnings }: { ticker: string; earnings: EarningsItem[] }) {
   const nearestEarnings = earnings
-    .filter((item) => item.symbol === detail.ticker)
+    .filter((item) => item.symbol === ticker)
     .sort((a, b) => a.date.localeCompare(b.date))[0];
+  if (!nearestEarnings) return null;
   return (
-    <div className="space-y-3">
-      <div>
-        <h3 className="text-sm font-bold">요약</h3>
-        {detail.name && <p className="mt-1 text-xs text-sub">{detail.name}</p>}
+    <div className="rounded-lg border border-border p-3 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-bold">가까운 실적</span>
+        <span className="text-sub">{nearestEarnings.date}</span>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <Metric label="현재가" value={detail.price ? usd(detail.price) : '-'} />
-        <Metric label="오늘" value={typeof detail.dayPct === 'number' ? pct(detail.dayPct) : '-'} className={colorClass(detail.dayPct ?? 0)} />
-        <Metric label="평가금액" value={typeof detail.value === 'number' ? usd(detail.value) : '-'} />
-        <Metric label="비중" value={typeof detail.weight === 'number' ? `${detail.weight.toFixed(1)}%` : '-'} />
-        <Metric label="손익" value={typeof detail.pnl === 'number' ? usd(detail.pnl) : '-'} className={colorClass(detail.pnl ?? 0)} />
-        <Metric label="수익률" value={typeof detail.pnlPct === 'number' ? pct(detail.pnlPct) : '-'} className={colorClass(detail.pnlPct ?? 0)} />
-      </div>
-      {(detail.shares || detail.avgCost) && (
-        <div className="rounded-lg bg-bg p-3 text-xs text-sub">
-          보유 {detail.shares ?? '-'}주 · 평단 {detail.avgCost ? usd(detail.avgCost) : '-'}
-        </div>
-      )}
-      <div className="grid gap-2 text-xs">
-        {detail.targetPrice ? <DistanceRow label="목표가" value={usd(detail.targetPrice)} distance={targetDistance} /> : null}
-        {detail.stopLoss ? <DistanceRow label="손절가" value={usd(detail.stopLoss)} distance={stopDistance} /> : null}
-        {detail.targetBuy ? <DistanceRow label="목표 진입가" value={usd(detail.targetBuy)} distance={buyDistance} /> : null}
-      </div>
-      {nearestEarnings && (
-        <div className="rounded-lg border border-border p-3 text-xs">
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-bold">가까운 실적</span>
-            <span className="text-sub">{nearestEarnings.date}</span>
-          </div>
-          <div className="mt-1 text-sub">EPS 예상 {nearestEarnings.epsEstimate ?? '-'} · 매출 예상 {typeof nearestEarnings.revenueEstimate === 'number' ? `$${Math.round(nearestEarnings.revenueEstimate / 1000000).toLocaleString()}M` : '-'}</div>
-        </div>
-      )}
-      {detail.note && <div className="rounded-lg bg-bg p-3 text-xs text-sub">{detail.note}</div>}
-    </div>
-  );
-}
-
-function Metric({ label, value, className = '' }: { label: string; value: string; className?: string }) {
-  return (
-    <div className="rounded-lg bg-bg p-3">
-      <div className="text-sub">{label}</div>
-      <div className={`mt-1 font-bold ${className}`}>{value}</div>
-    </div>
-  );
-}
-
-function DistanceRow({ label, value, distance }: { label: string; value: string; distance: number | null }) {
-  return (
-    <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-      <span className="text-sub">{label}</span>
-      <strong>{value}{distance !== null ? ` (${pct(distance)})` : ''}</strong>
+      <div className="mt-1 text-sub">EPS 예상 {nearestEarnings.epsEstimate ?? '-'} · 매출 예상 {formatRevenue(nearestEarnings.revenueEstimate)}</div>
     </div>
   );
 }
@@ -378,12 +362,16 @@ export function EarningsPanel({ earnings, loading, onRefresh }: { earnings: Earn
       <div className="mt-3 space-y-2">
         {loading && <div className="rounded-lg bg-bg p-4 text-sm text-sub">실적 일정을 불러오는 중입니다.</div>}
         {!loading && earnings.length ? earnings.map((item) => {
-          const epsSurprise = typeof item.epsActual === 'number' && typeof item.epsEstimate === 'number'
-            ? item.epsActual - item.epsEstimate
-            : null;
-          const revenueSurprise = typeof item.revenueActual === 'number' && typeof item.revenueEstimate === 'number'
-            ? item.revenueActual - item.revenueEstimate
-            : null;
+          const epsSurprise = typeof item.epsSurprise === 'number'
+            ? item.epsSurprise
+            : typeof item.epsActual === 'number' && typeof item.epsEstimate === 'number'
+              ? item.epsActual - item.epsEstimate
+              : null;
+          const revenueSurprise = typeof item.revenueSurprise === 'number'
+            ? item.revenueSurprise
+            : typeof item.revenueActual === 'number' && typeof item.revenueEstimate === 'number'
+              ? item.revenueActual - item.revenueEstimate
+              : null;
           const result = epsSurprise === null && revenueSurprise === null
             ? null
             : (epsSurprise ?? 0) >= 0 && (revenueSurprise ?? 0) >= 0 ? 'beat' : 'miss';
@@ -399,8 +387,8 @@ export function EarningsPanel({ earnings, loading, onRefresh }: { earnings: Earn
             <div className="mt-1 grid gap-1 text-xs text-sub">
               <div>EPS 예상 {item.epsEstimate ?? '-'}{typeof item.epsActual === 'number' ? ` · 실제 ${item.epsActual}` : ''}</div>
               <div>
-                매출 예상 {typeof item.revenueEstimate === 'number' ? `$${Math.round(item.revenueEstimate / 1000000).toLocaleString()}M` : '-'}
-                {typeof item.revenueActual === 'number' ? ` · 실제 ${usd(item.revenueActual / 1000000000)}B` : ''}
+                매출 예상 {formatRevenue(item.revenueEstimate)}
+                {typeof item.revenueActual === 'number' ? ` · 실제 ${formatRevenue(item.revenueActual)}` : ''}
               </div>
             </div>
           </div>
@@ -408,4 +396,9 @@ export function EarningsPanel({ earnings, loading, onRefresh }: { earnings: Earn
       </div>
     </section>
   );
+}
+
+function formatRevenue(value?: number) {
+  if (typeof value !== 'number') return '-';
+  return `$${(value / 1000000000).toLocaleString('en-US', { maximumFractionDigits: 2 })}B`;
 }

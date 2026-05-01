@@ -19,30 +19,17 @@ export type EarningsItem = {
   hour?: string;
   epsEstimate?: number;
   epsActual?: number;
+  epsSurprise?: number;
+  epsSurprisePercent?: number;
   revenueEstimate?: number;
   revenueActual?: number;
+  revenueSurprise?: number;
+  revenueSurprisePercent?: number;
 };
 export type SharePayload = {
   date: string;
   pnl: number;
   rows: Array<{ t: string; n?: string; pnl: number; w: number }>;
-};
-
-export type TickerDetailData = {
-  ticker: string;
-  name?: string;
-  price?: number;
-  shares?: number;
-  avgCost?: number;
-  value?: number;
-  pnl?: number;
-  pnlPct?: number;
-  dayPct?: number;
-  weight?: number;
-  targetPrice?: number;
-  stopLoss?: number;
-  targetBuy?: number;
-  note?: string;
 };
 
 export const K = {
@@ -102,6 +89,15 @@ export function writeJson(key: string, value: unknown) {
 export function today() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export function daysSince(date?: string | null) {
+  if (!date) return null;
+  const start = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return null;
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.max(0, Math.floor((todayStart.getTime() - start.getTime()) / 86400000));
 }
 
 export function uid() {
