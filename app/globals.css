@@ -24,3 +24,30 @@
     color: rgb(var(--text));
   }
 }
+
+@media print {
+  header,
+  button,
+  textarea,
+  input,
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #fff !important;
+  }
+
+  main {
+    color: #111827 !important;
+  }
+
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+}
