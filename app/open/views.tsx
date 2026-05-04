@@ -114,7 +114,7 @@ export function PortfolioView(props: {
               <SortableTh label={`수익률${sortMark('pnlPct')}`} onClick={() => setSort('pnlPct')} />
               <SortableTh label={`오늘${sortMark('dayPct')}`} onClick={() => setSort('dayPct')} />
               <th className="px-3 py-3 text-right">목표/손절</th>
-              <th className="px-3 py-3 text-right">R:R</th>
+              <th className="px-3 py-3 text-right"><RRHeader /></th>
               <SortableTh label={`비중${sortMark('weight')}`} onClick={() => setSort('weight')} />
               <th className="px-3 py-3 text-right">관리</th>
             </tr>
@@ -151,7 +151,7 @@ export function PortfolioView(props: {
         {!props.rows.length && <div className="p-12 text-center text-sm text-sub">보유 종목이 없습니다.</div>}
       </div>
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <TickerDetail ticker={props.selectedTicker} theme={props.theme} earnings={holdingEarnings} memo={props.tickerMemos[props.selectedTicker] ?? ''} onSaveMemo={props.selectedTicker ? (text) => props.onSaveMemo(props.selectedTicker, text) : undefined} />
+        <TickerDetail ticker={props.selectedTicker} theme={props.theme} earnings={holdingEarnings} memo={props.tickerMemos[props.selectedTicker] ?? props.rows.find((r) => r.ticker === props.selectedTicker)?.note ?? ''} onSaveMemo={props.selectedTicker ? (text) => props.onSaveMemo(props.selectedTicker, text) : undefined} />
         <EarningsPanel earnings={holdingEarnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
       </div>
     </section>
@@ -525,4 +525,39 @@ function RRCell({ row }: { row: HoldingRow }) {
   const rr = reward / risk;
   const color = rr >= 2 ? 'text-emerald-600' : rr >= 1 ? 'text-amber-500' : 'text-rose-600';
   return <span className={color}>{rr.toFixed(1)}R</span>;
+}
+
+function RRHeader() {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="inline-flex items-center justify-end gap-1">
+      R:R
+      <span className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-border text-[10px] font-bold text-sub hover:border-brand hover:text-brand"
+        >
+          ?
+        </button>
+        {open && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+            <div className="absolute right-0 top-6 z-20 w-64 rounded-xl border border-border bg-card p-4 text-left text-xs shadow-xl">
+              <div className="mb-2 font-bold text-text">손익비 (Risk : Reward)</div>
+              <div className="leading-5 text-sub">
+                현재가를 기준으로 <b className="text-text">목표가까지 수익</b>과 <b className="text-text">손절가까지 손실</b>의 비율입니다.
+                숫자가 클수록 같은 리스크에 더 많은 수익을 기대할 수 있습니다.
+              </div>
+              <div className="mt-3 space-y-1.5">
+                <div className="flex items-center gap-2"><span className="font-extrabold text-emerald-600">2R 이상</span><span className="text-sub">— 우수 (목표 수익 ≥ 리스크 2배)</span></div>
+                <div className="flex items-center gap-2"><span className="font-extrabold text-amber-500">1R ~ 2R</span><span className="text-sub">— 보통</span></div>
+                <div className="flex items-center gap-2"><span className="font-extrabold text-rose-600">1R 미만</span><span className="text-sub">— 주의 (리스크 대비 수익 작음)</span></div>
+              </div>
+            </div>
+          </>
+        )}
+      </span>
+    </span>
+  );
 }

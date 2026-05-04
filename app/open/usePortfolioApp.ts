@@ -100,7 +100,12 @@ export function usePortfolioApp() {
       return;
     }
 
-    setHoldings(readJson<HoldingItem[]>(K.holdings, []));
+    const localHoldings = readJson<HoldingItem[]>(K.holdings, []);
+    const localMemos = readJson<Record<string, string>>(K.memos, {});
+    // holding.note → tickerMemos 흡수 (tickerMemos에 값이 없는 경우만)
+    const seedMemos = { ...localMemos };
+    localHoldings.forEach((h) => { if (h.note && !seedMemos[h.ticker]) seedMemos[h.ticker] = h.note; });
+    setHoldings(localHoldings);
     setWatch(readJson<WatchItem[]>(K.watch, []));
     setJournal(readJson<JournalItem[]>(K.journal, []));
     setHistory(readJson<HistoryEntry[]>(K.history, []));
@@ -108,7 +113,7 @@ export function usePortfolioApp() {
     setPrices(readJson<PriceMap>(K.prices, {}));
     setKrw(readJson<boolean>(K.krw, false));
     setTheme(readJson<'light' | 'dark'>(K.theme, 'light'));
-    setTickerMemos(readJson<Record<string, string>>(K.memos, {}));
+    setTickerMemos(seedMemos);
     setReady(true);
 
     const unsub = onAuthStateChanged(getFirebaseAuth(), async (nextUser) => {
@@ -121,18 +126,22 @@ export function usePortfolioApp() {
         const snap = await get(ref(getFirebaseDb(), userPtfPath(nextUser.uid)));
         const data = snap.val() as LegacyPortfolio | null;
         if (data) {
-          setHoldings(data.h ?? []);
+          const loadedHoldings = data.h ?? [];
+          setHoldings(loadedHoldings);
           setWatch(data.w ?? []);
           setJournal(data.j ?? []);
           setHistory(normalizeHistory(data.hi));
           setCash(data.c ?? 0);
-          if (data.m) setTickerMemos(data.m);
-          writeJson(K.holdings, data.h ?? []);
+          // holding.note → tickerMemos 흡수 (tickerMemos에 값이 없는 경우만)
+          const mergedMemos: Record<string, string> = { ...(data.m ?? {}) };
+          loadedHoldings.forEach((h) => { if (h.note && !mergedMemos[h.ticker]) mergedMemos[h.ticker] = h.note; });
+          setTickerMemos(mergedMemos);
+          writeJson(K.holdings, loadedHoldings);
           writeJson(K.watch, data.w ?? []);
           writeJson(K.journal, data.j ?? []);
           writeJson(K.history, data.hi ?? []);
           writeJson(K.cash, data.c ?? 0);
-          if (data.m) writeJson(K.memos, data.m);
+          writeJson(K.memos, mergedMemos);
           notify('Firebase 데이터를 불러왔습니다');
         }
       } catch {
@@ -167,7 +176,7 @@ export function usePortfolioApp() {
     if (!ready || sharePayload || demo) return;
     if (user && history.length >= 2) refreshBenchmark();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, user, history.length, sharePayload]);
+  }, [ready, user, history.length, sharePayload, tab]);
 
   useEffect(() => {
     if (!ready || demo) return;
@@ -367,6 +376,10 @@ export function usePortfolioApp() {
       }
       return [...prev, entry];
     });
+    // 종목 폼의 note도 tickerMemos에 동기화
+    if (item.note !== undefined) {
+      setTickerMemos((prev) => ({ ...prev, [ticker]: item.note ?? prev[ticker] ?? '' }));
+    }
     setShowHoldingForm(false);
     setEditingHolding(null);
   }
@@ -498,6 +511,8 @@ export function usePortfolioApp() {
 
   function saveTickerMemo(ticker: string, text: string) {
     setTickerMemos((prev) => ({ ...prev, [ticker]: text }));
+    // 보유 종목이면 holding.note도 함께 동기화
+    setHoldings((prev) => prev.map((h) => h.ticker === ticker ? { ...h, note: text } : h));
   }
 
   async function refreshBenchmark() {

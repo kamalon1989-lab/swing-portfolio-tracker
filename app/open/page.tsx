@@ -6,6 +6,27 @@ import { AssetsView, MobileTabs, PortfolioPdfReport, ShareView } from './panels'
 import { JournalView, PortfolioView, WatchView } from './views';
 import { usePortfolioApp } from './usePortfolioApp';
 
+function MoreMenu({ items }: { items: { label: string; onClick: () => void }[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen((v) => !v)} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub hover:text-text">⋯</button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full z-20 mt-1 w-36 rounded-xl border border-border bg-card shadow-lg">
+            {items.map(({ label, onClick }) => (
+              <button key={label} onClick={() => { onClick(); setOpen(false); }} className="block w-full px-4 py-2.5 text-left text-sm hover:bg-bg first:rounded-t-xl last:rounded-b-xl">
+                {label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function OpenPage() {
   const app = usePortfolioApp();
   const [showSizingForm, setShowSizingForm] = useState(false);
@@ -114,17 +135,17 @@ export default function OpenPage() {
           {signedIn && tab === 'portfolio' && (
             <div className="no-print hidden items-center gap-1 sm:flex">
               <div className="mx-1 h-4 w-px bg-border" />
-              <button onClick={() => { setEditingHolding(null); setShowHoldingForm(true); }} className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-white">
-                종목 추가
-              </button>
-              <button onClick={() => setShowSizingForm(true)} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub hover:text-text">포지션 계산</button>
-              <button onClick={makeShareUrl} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub hover:text-text">공유</button>
-              <button onClick={exportPdfReport} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub hover:text-text">PDF</button>
-              <button onClick={exportBackup} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub hover:text-text">백업</button>
+              <button onClick={() => { setEditingHolding(null); setShowHoldingForm(true); }} className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-white">종목 추가</button>
+              <MoreMenu items={[
+                { label: '포지션 계산', onClick: () => setShowSizingForm(true) },
+                { label: '공유 링크', onClick: makeShareUrl },
+                { label: 'PDF 내보내기', onClick: exportPdfReport },
+                { label: '백업 저장', onClick: exportBackup },
+              ]} />
             </div>
           )}
           <div className="ml-auto flex items-center gap-2">
-            <span className="hidden text-xs text-sub md:inline">{status}</span>
+            <span className="hidden text-xs text-sub lg:inline" title={status}>●</span>
             {signedIn && (
               <>
                 <button onClick={() => setKrw((v) => !v)} className={`rounded-md border px-3 py-1.5 text-sm font-semibold ${krw ? 'border-brand bg-brand/10 text-brand' : 'border-border text-sub'}`}>원화</button>
