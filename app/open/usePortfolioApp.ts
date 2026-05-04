@@ -101,12 +101,14 @@ export function usePortfolioApp() {
     }
 
     const localHoldings = readJson<HoldingItem[]>(K.holdings, []);
+    const localWatch = readJson<WatchItem[]>(K.watch, []);
     const localMemos = readJson<Record<string, string>>(K.memos, {});
-    // holding.note → tickerMemos 흡수 (tickerMemos에 값이 없는 경우만)
+    // holding.note / watch.note → tickerMemos 흡수 (tickerMemos에 값이 없는 경우만)
     const seedMemos = { ...localMemos };
     localHoldings.forEach((h) => { if (h.note && !seedMemos[h.ticker]) seedMemos[h.ticker] = h.note; });
+    localWatch.forEach((w) => { if (w.note && !seedMemos[w.ticker]) seedMemos[w.ticker] = w.note; });
     setHoldings(localHoldings);
-    setWatch(readJson<WatchItem[]>(K.watch, []));
+    setWatch(localWatch);
     setJournal(readJson<JournalItem[]>(K.journal, []));
     setHistory(readJson<HistoryEntry[]>(K.history, []));
     setCash(readJson<number>(K.cash, 0));
@@ -127,14 +129,16 @@ export function usePortfolioApp() {
         const data = snap.val() as LegacyPortfolio | null;
         if (data) {
           const loadedHoldings = data.h ?? [];
+          const loadedWatch = data.w ?? [];
           setHoldings(loadedHoldings);
-          setWatch(data.w ?? []);
+          setWatch(loadedWatch);
           setJournal(data.j ?? []);
           setHistory(normalizeHistory(data.hi));
           setCash(data.c ?? 0);
-          // holding.note → tickerMemos 흡수 (tickerMemos에 값이 없는 경우만)
+          // holding.note / watch.note → tickerMemos 흡수 (tickerMemos에 값이 없는 경우만)
           const mergedMemos: Record<string, string> = { ...(data.m ?? {}) };
           loadedHoldings.forEach((h) => { if (h.note && !mergedMemos[h.ticker]) mergedMemos[h.ticker] = h.note; });
+          loadedWatch.forEach((w) => { if (w.note && !mergedMemos[w.ticker]) mergedMemos[w.ticker] = w.note; });
           setTickerMemos(mergedMemos);
           writeJson(K.holdings, loadedHoldings);
           writeJson(K.watch, data.w ?? []);
@@ -174,9 +178,9 @@ export function usePortfolioApp() {
 
   useEffect(() => {
     if (!ready || sharePayload || demo) return;
-    if (user && history.length >= 2) refreshBenchmark();
+    if (history.length >= 2) refreshBenchmark();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, user, history.length, sharePayload, tab]);
+  }, [ready, history.length, sharePayload, tab]);
 
   useEffect(() => {
     if (!ready || demo) return;
@@ -399,6 +403,10 @@ export function usePortfolioApp() {
       }
       return [...prev, entry];
     });
+    // 관심 종목 note → tickerMemos 동기화
+    if (item.note !== undefined) {
+      setTickerMemos((prev) => ({ ...prev, [ticker]: item.note ?? prev[ticker] ?? '' }));
+    }
     setShowWatchForm(false);
     setEditingWatch(null);
   }
@@ -511,29 +519,29 @@ export function usePortfolioApp() {
 
   function saveTickerMemo(ticker: string, text: string) {
     setTickerMemos((prev) => ({ ...prev, [ticker]: text }));
-    // 보유 종목이면 holding.note도 함께 동기화
+    // 보유 종목 note 동기화
     setHoldings((prev) => prev.map((h) => h.ticker === ticker ? { ...h, note: text } : h));
+    // 관심 종목 note 동기화
+    setWatch((prev) => prev.map((w) => w.ticker === ticker ? { ...w, note: text } : w));
   }
 
   async function refreshBenchmark() {
-    const current = getFirebaseAuth().currentUser;
-    if (!current) return;
     const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date));
-    if (!sorted.length) return;
+    if (sorted.length < 2) return;
     const from = Math.floor(new Date(sorted[0].date + 'T00:00:00').getTime() / 1000);
     const to = Math.floor(Date.now() / 1000);
     try {
-      const token = await current.getIdToken();
-      const res = await fetch(`/api/finnhub/stock/candle?symbol=SPY&resolution=D&from=${from}&to=${to}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // Yahoo Finance 프록시 사용 (API 키 불필요, Finnhub 레이트 리밋 무관)
+      const res = await fetch(`/api/spy-history?from=${from}&to=${to}`);
       if (!res.ok) return;
       const data = await res.json();
-      if (data.s !== 'ok' || !Array.isArray(data.c)) return;
-      const candles: { date: string; price: number }[] = (data.t as number[]).map((t: number, i: number) => ({
-        date: new Date(t * 1000).toISOString().slice(0, 10),
-        price: data.c[i] as number,
-      }));
+      const result = data?.chart?.result?.[0];
+      if (!result) return;
+      const timestamps: number[] = result.timestamp ?? [];
+      const closes: number[] = result.indicators?.quote?.[0]?.close ?? [];
+      const candles = timestamps
+        .map((t, i) => ({ date: new Date(t * 1000).toISOString().slice(0, 10), price: closes[i] }))
+        .filter((c) => typeof c.price === 'number' && !isNaN(c.price));
       setBenchData(candles);
     } catch {
       // 벤치마크 조회 실패는 무시

@@ -1,10 +1,31 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CashForm, HistoryForm, HoldingForm, PositionSizingForm, RecordDateForm, TradeForm, WatchForm } from './forms';
 import { AssetsView, MobileTabs, PortfolioPdfReport, ShareView } from './panels';
 import { JournalView, PortfolioView, WatchView } from './views';
 import { usePortfolioApp } from './usePortfolioApp';
+
+function MarketSessionBadge() {
+  const [session, setSession] = useState<{ label: string; color: string } | null>(null);
+  useEffect(() => {
+    function calc() {
+      const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const day = et.getDay(); // 0=일, 6=토
+      const t = et.getHours() * 60 + et.getMinutes();
+      if (day === 0 || day === 6) return { label: '휴장', color: 'bg-slate-500/10 text-slate-500' };
+      if (t >= 240  && t < 570)  return { label: '프리장', color: 'bg-amber-500/15 text-amber-500' };
+      if (t >= 570  && t < 960)  return { label: '장중',   color: 'bg-emerald-500/15 text-emerald-500' };
+      if (t >= 960  && t < 1200) return { label: '애프터', color: 'bg-sky-500/15 text-sky-500' };
+      return { label: '휴장', color: 'bg-slate-500/10 text-slate-500' };
+    }
+    setSession(calc());
+    const id = window.setInterval(() => setSession(calc()), 60000);
+    return () => window.clearInterval(id);
+  }, []);
+  if (!session) return null;
+  return <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${session.color}`}>{session.label}</span>;
+}
 
 function MoreMenu({ items }: { items: { label: string; onClick: () => void }[] }) {
   const [open, setOpen] = useState(false);
@@ -148,6 +169,7 @@ export default function OpenPage() {
             <span className="hidden text-xs text-sub lg:inline" title={status}>●</span>
             {signedIn && (
               <>
+                <MarketSessionBadge />
                 <button onClick={() => setKrw((v) => !v)} className={`rounded-md border px-3 py-1.5 text-sm font-semibold ${krw ? 'border-brand bg-brand/10 text-brand' : 'border-border text-sub'}`}>원화</button>
                 <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub">
                   {theme === 'dark' ? '라이트' : '다크'}

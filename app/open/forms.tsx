@@ -95,6 +95,7 @@ export function TradeForm({
 }
 
 export function PositionSizingForm({ totalAsset, onClose }: { totalAsset: number; onClose: () => void }) {
+  const [showGuide, setShowGuide] = useState(false);
   const [accountSize, setAccountSize] = useState(totalAsset > 0 ? totalAsset.toFixed(2) : '');
   const [riskPct, setRiskPct] = useState('1');
   const [price, setPrice] = useState('');
@@ -112,6 +113,27 @@ export function PositionSizingForm({ totalAsset, onClose }: { totalAsset: number
 
   return (
     <Modal title="포지션 사이징 계산기" onClose={onClose}>
+      {/* 사용 방법 토글 */}
+      <div className="mb-3">
+        <button type="button" onClick={() => setShowGuide((v) => !v)} className="flex items-center gap-1 text-xs font-semibold text-brand hover:underline">
+          <span>{showGuide ? '▾' : '▸'}</span> 사용 방법
+        </button>
+        {showGuide && (
+          <div className="mt-2 rounded-xl border border-border bg-bg p-3 text-xs leading-5 text-sub">
+            <div className="mb-2 font-semibold text-text">📐 포지션 사이징이란?</div>
+            <div>한 번의 거래에서 감당할 손실을 계좌의 일정 비율로 제한하여 <b className="text-text">적정 매수 수량</b>을 계산하는 방법입니다.</div>
+            <div className="mt-3 space-y-1.5">
+              <div><b className="text-brand">① 총 자산</b> — 포트폴리오 전체 금액 (자동 입력)</div>
+              <div><b className="text-brand">② 리스크 비율</b> — 이 거래에서 잃어도 되는 최대 비율<br /><span className="text-slate-400">예: 1% → 총 자산의 1%까지 손실 허용</span></div>
+              <div><b className="text-brand">③ 매수 가격 / 손절 가격</b> — 진입가와 손절가 입력</div>
+            </div>
+            <div className="mt-3 rounded-lg bg-card px-3 py-2 font-semibold text-text">
+              수량 = 리스크 금액 ÷ (매수가 − 손절가)
+            </div>
+            <div className="mt-2 text-slate-400">예: 총 자산 $30,000 · 리스크 1% · 매수 $200 · 손절 $190<br />→ 리스크 금액 $300 ÷ $10 = <b className="text-brand">30주</b></div>
+          </div>
+        )}
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="총 자산 ($)"><input className={inputClass()} type="number" step="0.01" value={accountSize} onChange={(e) => setAccountSize(e.target.value)} /></Field>
         <Field label="리스크 비율 (%)"><input className={inputClass()} type="number" step="0.1" min="0.1" max="100" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} /></Field>
