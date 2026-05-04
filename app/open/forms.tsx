@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import type { HoldingItem, JournalItem, WatchItem } from '@/lib/firebase';
-import { today } from './model';
+import { today, type HistoryEntry } from './model';
 
 export function HoldingForm({
   item,
@@ -82,6 +82,36 @@ export function TradeForm({
         <Field label="수수료" optional><input className={inputClass()} type="number" step="0.01" value={form.fee || ''} onChange={(e) => setForm({ ...form, fee: Number(e.target.value) })} /></Field>
         <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={sync} disabled={!!item} onChange={(e) => setSync(e.target.checked)} /> 보유 종목과 예수금에 반영</label>
         <Field label="메모" optional><input className={inputClass()} value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></Field>
+        <button className="rounded-lg bg-brand px-4 py-2 font-bold text-white sm:col-span-2">저장</button>
+      </form>
+    </Modal>
+  );
+}
+
+export function RecordDateForm({ onSave, onClose }: { onSave: (date: string) => void; onClose: () => void }) {
+  const [date, setDate] = useState(today());
+  return (
+    <Modal title="자산 기록 날짜 선택" onClose={onClose}>
+      <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); onSave(date); }}>
+        <Field label="기록 날짜" required>
+          <input className={inputClass()} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <button className="rounded-lg bg-brand px-4 py-2 font-bold text-white">기록 저장</button>
+      </form>
+    </Modal>
+  );
+}
+
+export function HistoryForm({ entry, onSave, onClose }: { entry: HistoryEntry; onSave: (entry: HistoryEntry) => void; onClose: () => void }) {
+  const [form, setForm] = useState<HistoryEntry>(entry);
+  return (
+    <Modal title="자산 기록 수정" onClose={onClose}>
+      <form className="grid gap-3 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); onSave(form); }}>
+        <Field label="날짜" required><input className={inputClass()} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></Field>
+        <Field label="총 자산" required><input className={inputClass()} type="number" step="0.01" value={form.totalValue || ''} onChange={(e) => setForm({ ...form, totalValue: Number(e.target.value) })} /></Field>
+        <Field label="주식 평가금액" required><input className={inputClass()} type="number" step="0.01" value={form.stockValue || ''} onChange={(e) => setForm({ ...form, stockValue: Number(e.target.value) })} /></Field>
+        <Field label="예수금" required><input className={inputClass()} type="number" step="0.01" value={form.cashValue || ''} onChange={(e) => setForm({ ...form, cashValue: Number(e.target.value) })} /></Field>
+        <Field label="매수 금액" required><input className={inputClass()} type="number" step="0.01" value={form.totalCost || ''} onChange={(e) => setForm({ ...form, totalCost: Number(e.target.value) })} /></Field>
         <button className="rounded-lg bg-brand px-4 py-2 font-bold text-white sm:col-span-2">저장</button>
       </form>
     </Modal>

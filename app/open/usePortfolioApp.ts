@@ -20,6 +20,7 @@ import {
   demoJournal,
   demoPrices,
   demoWatch,
+  earningsSymbolMatches,
   normalizeHistory,
   normalizeTicker,
   readJson,
@@ -28,8 +29,6 @@ import {
   writeJson,
   type EarningsItem,
   type HistoryEntry,
-  type NewsItem,
-  type NewsState,
   type PriceMap,
   type SharePayload,
   type Tab,
@@ -60,9 +59,10 @@ export function usePortfolioApp() {
   const [showWatchForm, setShowWatchForm] = useState(false);
   const [showTradeForm, setShowTradeForm] = useState(false);
   const [showCashForm, setShowCashForm] = useState(false);
+  const [showRecordForm, setShowRecordForm] = useState(false);
+  const [editingHistory, setEditingHistory] = useState<HistoryEntry | null>(null);
+  const [showHistoryForm, setShowHistoryForm] = useState(false);
   const [selectedTicker, setSelectedTicker] = useState('');
-  const [news, setNews] = useState<Record<string, NewsItem[]>>({});
-  const [newsState, setNewsState] = useState<Record<string, NewsState>>({});
   const [earnings, setEarnings] = useState<EarningsItem[]>([]);
   const [loadingEarnings, setLoadingEarnings] = useState(false);
   const [sharePayload, setSharePayload] = useState<SharePayload | null>(null);
@@ -260,15 +260,19 @@ export function usePortfolioApp() {
         .then((d) => setRate(d.rates.KRW || 0))
         .catch(() => undefined);
       const token = await current.getIdToken();
+      const results = await Promise.all(
+        tickers.map((ticker) =>
+          fetch(`/api/finnhub/quote?symbol=${encodeURIComponent(ticker)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+            .then((res) => res.ok ? res.json() : null)
+            .catch(() => null)
+            .then((data) => ({ ticker, data }))
+        )
+      );
       const next: PriceMap = { ...prices };
-      for (const ticker of tickers) {
-        const res = await fetch(`/api/finnhub/quote?symbol=${encodeURIComponent(ticker)}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.c) next[ticker] = { price: data.c, changePercent: data.dp ?? 0, prevClose: data.pc ?? data.c };
-        }
+      for (const { ticker, data } of results) {
+        if (data?.c) next[ticker] = { price: data.c, changePercent: data.dp ?? 0, prevClose: data.pc ?? data.c };
       }
       setPrices(next);
       setStatus(`${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 시세 갱신`);
@@ -330,37 +334,8 @@ export function usePortfolioApp() {
     }
   }
 
-  async function openTickerDetail(ticker: string) {
+  function openTickerDetail(ticker: string) {
     setSelectedTicker(ticker);
-    if (demo) {
-      setNews((prev) => ({
-        ...prev,
-        [ticker]: [
-          { id: 1, datetime: Math.floor(Date.now() / 1000), source: 'Demo Wire', headline: `${ticker} 관련 AI 인프라 수요 기대 지속`, url: '#' },
-          { id: 2, datetime: Math.floor(Date.now() / 1000) - 86400, source: 'Demo Market', headline: `${ticker} 다음 실적 발표 전 변동성 확대`, url: '#' },
-        ],
-      }));
-      setNewsState((prev) => ({ ...prev, [ticker]: 'loaded' }));
-      return;
-    }
-    if (news[ticker]) return;
-    setNewsState((prev) => ({ ...prev, [ticker]: 'loading' }));
-    const to = new Date();
-    const from = new Date();
-    from.setDate(to.getDate() - 7);
-    try {
-      const data = await fetchFinnhubJson('company-news', {
-        symbol: ticker,
-        from: from.toISOString().slice(0, 10),
-        to: to.toISOString().slice(0, 10),
-      });
-      const items = (Array.isArray(data) ? data : []).slice(0, 6) as NewsItem[];
-      setNews((prev) => ({ ...prev, [ticker]: items }));
-      setNewsState((prev) => ({ ...prev, [ticker]: items.length ? 'loaded' : 'empty' }));
-    } catch {
-      setNewsState((prev) => ({ ...prev, [ticker]: 'error' }));
-      notify(`${ticker} 뉴스를 불러오지 못했습니다`);
-    }
   }
 
   function saveHolding(item: HoldingItem) {
@@ -439,16 +414,29 @@ export function usePortfolioApp() {
     setEditingTrade(null);
   }
 
-  function recordToday() {
+  function recordToday(date: string) {
     const entry: HistoryEntry = {
-      date: today(),
+      date,
       totalValue: summary.totalAsset,
       stockValue: summary.stockValue,
       cashValue: cash,
       totalCost: summary.totalCost,
     };
     setHistory((prev) => [entry, ...prev.filter((x) => x.date !== entry.date)].sort((a, b) => b.date.localeCompare(a.date)));
-    notify('오늘 기록을 저장했습니다');
+    setShowRecordForm(false);
+    notify('자산 기록을 저장했습니다');
+  }
+
+  function saveHistory(entry: HistoryEntry) {
+    setHistory((prev) => [entry, ...prev.filter((x) => x.date !== entry.date)].sort((a, b) => b.date.localeCompare(a.date)));
+    setShowHistoryForm(false);
+    setEditingHistory(null);
+    notify('자산 기록을 수정했습니다');
+  }
+
+  function deleteHistory(date: string) {
+    setHistory((prev) => prev.filter((x) => x.date !== date));
+    notify('자산 기록을 삭제했습니다');
   }
 
   function exportBackup() {
@@ -495,11 +483,6 @@ export function usePortfolioApp() {
     return [ticker];
   }
 
-  function earningsSymbolMatches(ticker: string, symbol: string) {
-    if (ticker === symbol) return true;
-    return (ticker === 'GOOGL' && symbol === 'GOOG') || (ticker === 'GOOG' && symbol === 'GOOGL');
-  }
-
   return {
     ready,
     user,
@@ -538,9 +521,13 @@ export function usePortfolioApp() {
     setShowTradeForm,
     showCashForm,
     setShowCashForm,
+    showRecordForm,
+    setShowRecordForm,
+    editingHistory,
+    setEditingHistory,
+    showHistoryForm,
+    setShowHistoryForm,
     selectedTicker,
-    news,
-    newsState,
     earnings,
     loadingEarnings,
     sharePayload,
@@ -557,6 +544,8 @@ export function usePortfolioApp() {
     saveTrade,
     saveCash,
     recordToday,
+    saveHistory,
+    deleteHistory,
     exportBackup,
     makeShareUrl,
     exportPdfReport,

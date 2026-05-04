@@ -6,12 +6,11 @@ import { EarningsPanel, TickerDetail } from './panels';
 import {
   colorClass,
   daysSince,
+  earningsSymbolMatches,
   money,
   pct,
   usd,
   type EarningsItem,
-  type NewsItem,
-  type NewsState,
   type PriceMap,
 } from './model';
 
@@ -37,17 +36,11 @@ export function PortfolioView(props: {
   krw: boolean;
   rate: number;
   onEditCash: () => void;
-  onAdd: () => void;
   onEdit: (item: HoldingItem) => void;
   onDelete: (ticker: string) => void;
   onRecord: () => void;
-  onShare: () => void;
-  onPdf: () => void;
-  onExport: () => void;
   selectedTicker: string;
   onSelectTicker: (ticker: string) => void;
-  selectedNews: NewsItem[];
-  selectedNewsState: NewsState;
   theme: 'light' | 'dark';
   earnings: EarningsItem[];
   loadingEarnings: boolean;
@@ -74,6 +67,10 @@ export function PortfolioView(props: {
   };
   const sortMark = (key: SortKey) => sortKey === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
   const alerts = makePriceAlerts(props.rows);
+  const holdingTickers = new Set(props.rows.map((r) => r.ticker));
+  const holdingEarnings = props.earnings.filter((item) =>
+    Array.from(holdingTickers).some((ticker) => earningsSymbolMatches(ticker, item.symbol))
+  );
   const cards = [
     ['주식 평가금액', money(props.summary.stockValue, props.krw, props.rate), `매수 ${money(props.summary.totalCost, props.krw, props.rate)}`, 'text-brand'],
     ['누적 손익', money(props.summary.totalPnl, props.krw, props.rate), pct(props.summary.totalPnlPct), colorClass(props.summary.totalPnl)],
@@ -92,15 +89,12 @@ export function PortfolioView(props: {
           </button>
         ))}
       </div>
-      <div className="no-print flex flex-wrap gap-2 rounded-xl border border-border bg-card p-3">
-        <button onClick={props.onAdd} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">보유 종목 추가</button>
-        <button onClick={props.onRecord} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">오늘 기록</button>
-        <button onClick={props.onShare} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">공유 링크</button>
-        <button onClick={props.onPdf} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">PDF 내보내기</button>
-        <button onClick={props.onExport} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">백업 저장</button>
-      </div>
       <PriceAlerts alerts={alerts} />
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+        <div className="no-print flex items-center justify-between border-b border-border px-4 py-2.5">
+          <span className="text-sm font-bold">보유 종목</span>
+          <button onClick={props.onRecord} className="rounded-lg border border-border px-3 py-1.5 text-xs font-bold">오늘 기록</button>
+        </div>
         <table className="w-full min-w-[860px] text-sm">
           <thead className="bg-bg text-xs text-sub">
             <tr>
@@ -148,8 +142,8 @@ export function PortfolioView(props: {
         {!props.rows.length && <div className="p-12 text-center text-sm text-sub">보유 종목이 없습니다.</div>}
       </div>
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <TickerDetail ticker={props.selectedTicker} news={props.selectedNews} state={props.selectedNewsState} theme={props.theme} earnings={props.earnings} />
-        <EarningsPanel earnings={props.earnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
+        <TickerDetail ticker={props.selectedTicker} theme={props.theme} earnings={holdingEarnings} />
+        <EarningsPanel earnings={holdingEarnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
       </div>
     </section>
   );
@@ -230,11 +224,6 @@ function makeWatchPriceAlerts(watch: WatchItem[], prices: PriceMap) {
   return alerts;
 }
 
-function earningsSymbolMatches(ticker: string, symbol: string) {
-  if (ticker === symbol) return true;
-  return (ticker === 'GOOGL' && symbol === 'GOOG') || (ticker === 'GOOG' && symbol === 'GOOGL');
-}
-
 function HoldingDaysBadge({ buyDate }: { buyDate?: string | null }) {
   const days = daysSince(buyDate);
   if (days === null) return null;
@@ -253,8 +242,6 @@ export function WatchView({
   onDelete,
   onSelectTicker,
   selectedTicker,
-  selectedNews,
-  selectedNewsState,
   theme,
   earnings,
   loadingEarnings,
@@ -268,8 +255,6 @@ export function WatchView({
   onDelete: (ticker: string) => void;
   onSelectTicker: (ticker: string) => void;
   selectedTicker: string;
-  selectedNews: NewsItem[];
-  selectedNewsState: NewsState;
   theme: 'light' | 'dark';
   earnings: EarningsItem[];
   loadingEarnings: boolean;
@@ -285,19 +270,74 @@ export function WatchView({
         <button onClick={onAdd} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">관심 종목 추가</button>
         <button onClick={onExportTradingView} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">TradingView 복사</button>
       </div>
+      <PriceAlerts alerts={alerts} />
       <div className="overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full min-w-[680px] text-sm">
-          <thead className="bg-bg text-xs text-sub"><tr><th className="px-3 py-3 text-left">티커</th><th className="px-3 py-3 text-right">현재가</th><th className="px-3 py-3 text-right">목표 진입가</th><th className="px-3 py-3 text-right">오늘</th><th className="px-3 py-3 text-left">메모</th><th className="px-3 py-3 text-right">관리</th></tr></thead>
-          <tbody>{watch.map((w) => <tr key={w.ticker} className="border-t border-border hover:bg-bg"><td className="px-3 py-3"><strong className="text-brand">{w.ticker}</strong><div className="text-xs text-sub">{w.name}</div></td><td className="px-3 py-3 text-right font-semibold">{prices[w.ticker]?.price ? usd(prices[w.ticker].price) : '-'}</td><td className="px-3 py-3 text-right">{w.targetBuy ? usd(w.targetBuy) : '-'}</td><td className={`px-3 py-3 text-right ${colorClass(prices[w.ticker]?.changePercent ?? 0)}`}>{prices[w.ticker] ? pct(prices[w.ticker].changePercent ?? 0) : '-'}</td><td className="px-3 py-3 text-sub">{w.note || '-'}</td><td className="px-3 py-3 text-right"><button onClick={() => onSelectTicker(w.ticker)} className="no-print mr-2 text-slate-700">상세</button><button onClick={() => onEdit(w)} className="no-print mr-2 text-brand">수정</button><button onClick={() => onDelete(w.ticker)} className="no-print text-rose-600">삭제</button></td></tr>)}</tbody>
+          <thead className="bg-bg text-xs text-sub"><tr><th className="px-3 py-3 text-left">티커</th><th className="px-3 py-3 text-right">현재가</th><th className="px-3 py-3 text-right">목표 진입가</th><th className="px-3 py-3 text-right">거리</th><th className="px-3 py-3 text-right">오늘</th><th className="px-3 py-3 text-left">메모</th><th className="px-3 py-3 text-right">관리</th></tr></thead>
+          <tbody>{watch.map((w) => {
+            const price = prices[w.ticker]?.price;
+            const dist = (price && w.targetBuy) ? ((price - w.targetBuy) / price) * 100 : null;
+            return (
+              <tr key={w.ticker} className="border-t border-border hover:bg-bg">
+                <td className="px-3 py-3"><strong className="text-brand">{w.ticker}</strong><div className="text-xs text-sub">{w.name}</div></td>
+                <td className="px-3 py-3 text-right font-semibold">{price ? usd(price) : '-'}</td>
+                <td className="px-3 py-3 text-right">{w.targetBuy ? usd(w.targetBuy) : '-'}</td>
+                <td className={`px-3 py-3 text-right font-semibold ${dist === null ? '' : dist <= 0 ? 'text-emerald-600' : dist <= 5 ? 'text-amber-500' : 'text-sub'}`}>
+                  {dist === null ? '-' : dist <= 0 ? '도달' : `+${dist.toFixed(1)}%`}
+                </td>
+                <td className={`px-3 py-3 text-right ${colorClass(prices[w.ticker]?.changePercent ?? 0)}`}>{prices[w.ticker] ? pct(prices[w.ticker].changePercent ?? 0) : '-'}</td>
+                <td className="px-3 py-3 text-sub">{w.note || '-'}</td>
+                <td className="px-3 py-3 text-right"><button onClick={() => onSelectTicker(w.ticker)} className="no-print mr-2 text-slate-700">상세</button><button onClick={() => onEdit(w)} className="no-print mr-2 text-brand">수정</button><button onClick={() => onDelete(w.ticker)} className="no-print text-rose-600">삭제</button></td>
+              </tr>
+            );
+          })}</tbody>
         </table>
         {!watch.length && <div className="p-12 text-center text-sm text-sub">관심 종목이 없습니다.</div>}
       </div>
-      <PriceAlerts alerts={alerts} />
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <TickerDetail ticker={selectedTicker} news={selectedNews} state={selectedNewsState} theme={theme} earnings={watchEarnings} />
+        <TickerDetail ticker={selectedTicker} theme={theme} earnings={watchEarnings} />
         <EarningsPanel earnings={watchEarnings} loading={loadingEarnings} onRefresh={onRefreshEarnings} />
       </div>
     </section>
+  );
+}
+
+function JournalSummary({ journal }: { journal: JournalItem[] }) {
+  const sells = journal.filter((j) => j.action === 'sell');
+  if (!sells.length) return null;
+  const totalBuyMap: Record<string, { cost: number; shares: number }> = {};
+  journal.filter((j) => j.action === 'buy').forEach((j) => {
+    if (!totalBuyMap[j.ticker]) totalBuyMap[j.ticker] = { cost: 0, shares: 0 };
+    totalBuyMap[j.ticker].cost += j.shares * j.price;
+    totalBuyMap[j.ticker].shares += j.shares;
+  });
+  let realizedPnl = 0;
+  let wins = 0;
+  sells.forEach((j) => {
+    const buy = totalBuyMap[j.ticker];
+    if (!buy || !buy.shares) return;
+    const avgCost = buy.cost / buy.shares;
+    const pnlAmt = (j.price - avgCost) * j.shares - (j.fee || 0);
+    realizedPnl += pnlAmt;
+    if (pnlAmt > 0) wins++;
+  });
+  const winRate = sells.length ? (wins / sells.length) * 100 : 0;
+  const totalBuy = journal.filter((j) => j.action === 'buy').reduce((s, j) => s + j.shares * j.price, 0);
+  const totalSell = sells.reduce((s, j) => s + j.shares * j.price, 0);
+  return (
+    <div className="grid gap-3 sm:grid-cols-4">
+      {[
+        ['총 매수 금액', usd(totalBuy), 'text-blue-600'],
+        ['총 매도 금액', usd(totalSell), 'text-rose-600'],
+        ['실현 손익', usd(realizedPnl), colorClass(realizedPnl)],
+        ['매도 승률', `${winRate.toFixed(0)}% (${wins}/${sells.length})`, colorClass(winRate - 50)],
+      ].map(([label, value, color]) => (
+        <div key={label} className="rounded-xl border border-border bg-card p-4">
+          <div className="text-xs font-semibold uppercase text-sub">{label}</div>
+          <div className={`mt-2 text-lg font-extrabold ${color}`}>{value}</div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -306,6 +346,7 @@ export function JournalView({ journal, onAdd, onEdit, onDelete }: { journal: Jou
   return (
     <section className="space-y-4">
       <button onClick={onAdd} className="no-print rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">거래 추가</button>
+      <JournalSummary journal={journal} />
       <div className="overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full min-w-[780px] text-sm">
           <thead className="bg-bg text-xs text-sub"><tr><th className="px-3 py-3 text-left">날짜</th><th className="px-3 py-3">구분</th><th className="px-3 py-3 text-left">티커</th><th className="px-3 py-3 text-right">수량</th><th className="px-3 py-3 text-right">단가</th><th className="px-3 py-3 text-right">금액</th><th className="px-3 py-3 text-left">메모</th><th className="px-3 py-3 text-right">관리</th></tr></thead>

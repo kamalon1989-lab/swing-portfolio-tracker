@@ -2,13 +2,12 @@
 
 import {
   colorClass,
+  earningsSymbolMatches,
   pct,
   money,
   usd,
   type EarningsItem,
   type HistoryEntry,
-  type NewsItem,
-  type NewsState,
   type SharePayload,
   type Tab,
 } from './model';
@@ -99,6 +98,8 @@ export function AssetsView({
   cash,
   krw,
   rate,
+  onEditHistory,
+  onDeleteHistory,
 }: {
   history: HistoryEntry[];
   rows: AssetRow[];
@@ -106,6 +107,8 @@ export function AssetsView({
   cash: number;
   krw: boolean;
   rate: number;
+  onEditHistory: (entry: HistoryEntry) => void;
+  onDeleteHistory: (date: string) => void;
 }) {
   const donutRows: DonutRow[] = [
     ...rows.map((row) => ({
@@ -128,7 +131,7 @@ export function AssetsView({
         <h2 className="font-bold">자산 기록</h2>
         <div className="mt-4 overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-sm">
-            <thead className="bg-bg text-xs text-sub"><tr><th className="px-3 py-2 text-left">날짜</th><th className="px-3 py-2 text-right">총 자산</th><th className="px-3 py-2 text-right">주식</th><th className="px-3 py-2 text-right">예수금</th><th className="px-3 py-2 text-right">변화율</th></tr></thead>
+            <thead className="bg-bg text-xs text-sub"><tr><th className="px-3 py-2 text-left">날짜</th><th className="px-3 py-2 text-right">총 자산</th><th className="px-3 py-2 text-right">주식</th><th className="px-3 py-2 text-right">예수금</th><th className="px-3 py-2 text-right">변화율</th><th className="px-3 py-2 text-right">관리</th></tr></thead>
             <tbody>{history.map((h, index) => {
               const next = history[index + 1];
               const change = next?.totalValue ? ((h.totalValue - next.totalValue) / next.totalValue) * 100 : 0;
@@ -139,6 +142,10 @@ export function AssetsView({
                   <td className="px-3 py-2 text-right">{money(h.stockValue, krw, rate)}</td>
                   <td className="px-3 py-2 text-right">{money(h.cashValue, krw, rate)}</td>
                   <td className={`px-3 py-2 text-right font-semibold ${colorClass(change)}`}>{next ? pct(change) : '-'}</td>
+                  <td className="px-3 py-2 text-right">
+                    <button onClick={() => onEditHistory(h)} className="mr-2 text-brand text-xs">수정</button>
+                    <button onClick={() => onDeleteHistory(h.date)} className="text-rose-600 text-xs">삭제</button>
+                  </td>
                 </tr>
               );
             })}</tbody>
@@ -226,20 +233,27 @@ function AssetTrendChart({ history, krw, rate }: { history: HistoryEntry[]; krw:
     );
   }
   const width = 720;
-  const height = 240;
+  const height = 260;
   const paddingX = 72;
-  const paddingY = 28;
+  const paddingTop = 28;
+  const paddingBottom = 44;
   const values = history.flatMap((item) => [item.totalValue, item.stockValue, item.cashValue]);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min || 1;
+  const chartH = height - paddingTop - paddingBottom;
   const point = (value: number, index: number) => {
-    const x = paddingX + (index / Math.max(history.length - 1, 1)) * (width - paddingX - paddingY);
-    const y = height - paddingY - ((value - min) / span) * (height - paddingY * 2);
+    const x = paddingX + (index / Math.max(history.length - 1, 1)) * (width - paddingX - paddingTop);
+    const y = paddingTop + chartH - ((value - min) / span) * chartH;
     return `${x},${y}`;
   };
+  const xOf = (index: number) => paddingX + (index / Math.max(history.length - 1, 1)) * (width - paddingX - paddingTop);
   const makePoints = (key: 'totalValue' | 'stockValue' | 'cashValue') => history.map((item, index) => point(item[key], index)).join(' ');
   const latest = history[history.length - 1];
+  const labelIndices = history.length <= 6
+    ? history.map((_, i) => i)
+    : [0, Math.floor(history.length / 3), Math.floor(history.length * 2 / 3), history.length - 1];
+  const shownLabels = new Set(labelIndices);
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -253,20 +267,24 @@ function AssetTrendChart({ history, krw, rate }: { history: HistoryEntry[]; krw:
         </div>
       </div>
       <div className="mt-4 overflow-x-auto">
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-64 min-w-[620px] rounded-lg bg-bg">
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-72 min-w-[620px] rounded-lg bg-bg">
           {[0, 1, 2, 3].map((line) => {
-            const y = paddingY + line * ((height - paddingY * 2) / 3);
+            const y = paddingTop + line * (chartH / 3);
             const value = max - (line / 3) * span;
             return (
               <g key={line}>
-                <text x="12" y={y + 4} className="fill-sub text-[11px]">{money(value, krw, rate)}</text>
-                <line x1={paddingX} x2={width - paddingY} y1={y} y2={y} stroke="rgb(var(--border))" strokeWidth="1" />
+                <text x="12" y={y + 4} className="fill-sub text-[11px]" fontSize="11">{money(value, krw, rate)}</text>
+                <line x1={paddingX} x2={width - paddingTop} y1={y} y2={y} stroke="rgb(var(--border))" strokeWidth="1" />
               </g>
             );
           })}
           <polyline points={makePoints('totalValue')} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           <polyline points={makePoints('stockValue')} fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           <polyline points={makePoints('cashValue')} fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          {history.map((item, i) => shownLabels.has(i) ? (
+            <text key={item.date} x={xOf(i)} y={height - 8} textAnchor="middle" fontSize="10" className="fill-sub">{item.date.slice(5)}</text>
+          ) : null)}
+          <line x1={paddingX} x2={width - paddingTop} y1={paddingTop + chartH} y2={paddingTop + chartH} stroke="rgb(var(--border))" strokeWidth="1" />
         </svg>
       </div>
       <div className="mt-3 flex flex-wrap gap-3 text-xs text-sub">
@@ -280,21 +298,17 @@ function AssetTrendChart({ history, krw, rate }: { history: HistoryEntry[]; krw:
 
 export function TickerDetail({
   ticker,
-  news,
-  state = 'idle',
   theme = 'light',
   earnings = [],
 }: {
   ticker: string;
-  news: NewsItem[];
-  state?: NewsState;
   theme?: 'light' | 'dark';
   earnings?: EarningsItem[];
 }) {
   if (!ticker) {
     return (
       <section className="rounded-xl border border-border bg-card p-4 text-sm text-sub">
-        티커의 상세 버튼을 누르면 차트와 최근 뉴스가 여기에 표시됩니다.
+        티커의 상세 버튼을 누르면 차트가 여기에 표시됩니다.
       </section>
     );
   }
@@ -312,23 +326,13 @@ export function TickerDetail({
           TradingView 열기
         </a>
       </div>
-      <div className="grid gap-0 lg:grid-cols-[1fr_340px]">
+      <div className="p-0">
         <iframe title={`${ticker} TradingView chart`} src={chartUrl} className="h-[360px] w-full border-0" loading="lazy" />
-        <div className="border-t border-border p-4 lg:border-l lg:border-t-0">
-          <TickerEarningsSummary ticker={ticker} earnings={earnings} />
-          <h3 className="mt-5 text-sm font-bold">최근 뉴스</h3>
-          <div className="mt-3 space-y-3">
-            {state === 'loading' && <div className="rounded-lg bg-bg p-4 text-sm text-sub">최근 뉴스를 불러오는 중입니다.</div>}
-            {state === 'error' && <div className="rounded-lg bg-rose-50 p-4 text-sm text-rose-700">뉴스를 불러오지 못했습니다.</div>}
-            {state === 'empty' && <div className="rounded-lg bg-bg p-4 text-sm text-sub">최근 7일 내 뉴스가 없습니다.</div>}
-            {news.length ? news.map((item) => (
-              <a key={`${item.id}-${item.datetime}`} href={item.url} target="_blank" rel="noreferrer" className="block rounded-lg border border-border p-3 hover:bg-bg">
-                <div className="line-clamp-2 text-sm font-semibold">{item.headline}</div>
-                <div className="mt-1 text-xs text-sub">{item.source} · {new Date(item.datetime * 1000).toLocaleDateString('ko-KR')}</div>
-              </a>
-            )) : state === 'idle' ? <div className="rounded-lg bg-bg p-4 text-sm text-sub">상세 버튼을 누르면 최근 뉴스를 함께 불러옵니다.</div> : null}
+        {earnings.length > 0 && (
+          <div className="border-t border-border p-4">
+            <TickerEarningsSummary ticker={ticker} earnings={earnings} />
           </div>
-        </div>
+        )}
       </div>
     </section>
   );
@@ -430,7 +434,3 @@ function formatEarningsHour(hour?: string) {
   return '시간 미정';
 }
 
-function earningsSymbolMatches(ticker: string, symbol: string) {
-  if (ticker === symbol) return true;
-  return (ticker === 'GOOGL' && symbol === 'GOOG') || (ticker === 'GOOG' && symbol === 'GOOGL');
-}

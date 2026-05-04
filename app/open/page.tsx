@@ -1,6 +1,6 @@
 'use client';
 
-import { CashForm, HoldingForm, TradeForm, WatchForm } from './forms';
+import { CashForm, HistoryForm, HoldingForm, RecordDateForm, TradeForm, WatchForm } from './forms';
 import { AssetsView, MobileTabs, PortfolioPdfReport, ShareView } from './panels';
 import { JournalView, PortfolioView, WatchView } from './views';
 import { usePortfolioApp } from './usePortfolioApp';
@@ -43,9 +43,13 @@ export default function OpenPage() {
     setShowTradeForm,
     showCashForm,
     setShowCashForm,
+    showRecordForm,
+    setShowRecordForm,
+    editingHistory,
+    setEditingHistory,
+    showHistoryForm,
+    setShowHistoryForm,
     selectedTicker,
-    news,
-    newsState,
     earnings,
     loadingEarnings,
     sharePayload,
@@ -61,6 +65,8 @@ export default function OpenPage() {
     saveTrade,
     saveCash,
     recordToday,
+    saveHistory,
+    deleteHistory,
     exportBackup,
     makeShareUrl,
     exportPdfReport,
@@ -85,7 +91,7 @@ export default function OpenPage() {
       )}
       <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
-          <a href="/" className="font-bold">스윙 포트폴리오</a>
+          <a href="/" className="font-bold shrink-0">스윙 포트폴리오</a>
           {signedIn && (
             <nav className="hidden gap-1 rounded-lg bg-bg p-1 sm:flex">
               {([
@@ -99,6 +105,17 @@ export default function OpenPage() {
                 </button>
               ))}
             </nav>
+          )}
+          {signedIn && tab === 'portfolio' && (
+            <div className="no-print hidden items-center gap-1 sm:flex">
+              <div className="mx-1 h-4 w-px bg-border" />
+              <button onClick={() => { setEditingHolding(null); setShowHoldingForm(true); }} className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-white">
+                종목 추가
+              </button>
+              <button onClick={makeShareUrl} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub hover:text-text">공유</button>
+              <button onClick={exportPdfReport} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub hover:text-text">PDF</button>
+              <button onClick={exportBackup} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub hover:text-text">백업</button>
+            </div>
           )}
           <div className="ml-auto flex items-center gap-2">
             <span className="hidden text-xs text-sub md:inline">{status}</span>
@@ -145,24 +162,29 @@ export default function OpenPage() {
               krw={krw}
               rate={rate}
               onEditCash={() => setShowCashForm(true)}
-              onAdd={() => { setEditingHolding(null); setShowHoldingForm(true); }}
               onEdit={(item) => { setEditingHolding(item); setShowHoldingForm(true); }}
               onDelete={(ticker) => setHoldings((prev) => prev.filter((x) => x.ticker !== ticker))}
-              onRecord={recordToday}
-              onShare={makeShareUrl}
-              onPdf={exportPdfReport}
-              onExport={exportBackup}
+              onRecord={() => setShowRecordForm(true)}
               selectedTicker={selectedTicker}
               onSelectTicker={openTickerDetail}
-              selectedNews={selectedTicker ? news[selectedTicker] ?? [] : []}
-              selectedNewsState={selectedTicker ? newsState[selectedTicker] ?? 'idle' : 'idle'}
               theme={theme}
               earnings={earnings}
               loadingEarnings={loadingEarnings}
               onRefreshEarnings={refreshEarnings}
             />
           )}
-          {tab === 'assets' && <AssetsView history={history} rows={rows} summary={summary} cash={cash} krw={krw} rate={rate} />}
+          {tab === 'assets' && (
+            <AssetsView
+              history={history}
+              rows={rows}
+              summary={summary}
+              cash={cash}
+              krw={krw}
+              rate={rate}
+              onEditHistory={(entry) => { setEditingHistory(entry); setShowHistoryForm(true); }}
+              onDeleteHistory={deleteHistory}
+            />
+          )}
           {tab === 'watchlist' && (
             <WatchView
               watch={watch}
@@ -172,8 +194,6 @@ export default function OpenPage() {
               onDelete={(ticker) => setWatch((prev) => prev.filter((x) => x.ticker !== ticker))}
               onSelectTicker={openTickerDetail}
               selectedTicker={selectedTicker}
-              selectedNews={selectedTicker ? news[selectedTicker] ?? [] : []}
-              selectedNewsState={selectedTicker ? newsState[selectedTicker] ?? 'idle' : 'idle'}
               theme={theme}
               earnings={earnings}
               loadingEarnings={loadingEarnings}
@@ -207,6 +227,8 @@ export default function OpenPage() {
       {showWatchForm && <WatchForm item={editingWatch} onClose={() => setShowWatchForm(false)} onSave={saveWatch} />}
       {showTradeForm && <TradeForm item={editingTrade} onClose={() => setShowTradeForm(false)} onSave={saveTrade} />}
       {showCashForm && <CashForm cash={cash} onClose={() => setShowCashForm(false)} onSave={saveCash} />}
+      {showRecordForm && <RecordDateForm onClose={() => setShowRecordForm(false)} onSave={recordToday} />}
+      {showHistoryForm && editingHistory && <HistoryForm entry={editingHistory} onClose={() => { setShowHistoryForm(false); setEditingHistory(null); }} onSave={saveHistory} />}
     </main>
     {pdfPayload && <PortfolioPdfReport payload={pdfPayload} />}
     </>

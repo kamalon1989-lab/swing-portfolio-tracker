@@ -127,6 +127,11 @@ export function normalizeTicker(value: string) {
   return value.trim().toUpperCase();
 }
 
+export function earningsSymbolMatches(ticker: string, symbol: string) {
+  if (ticker === symbol) return true;
+  return (ticker === 'GOOGL' && symbol === 'GOOG') || (ticker === 'GOOG' && symbol === 'GOOGL');
+}
+
 export function normalizeHistory(input: unknown): HistoryEntry[] {
   if (!Array.isArray(input)) return [];
   return input
