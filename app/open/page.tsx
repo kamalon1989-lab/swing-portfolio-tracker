@@ -1,12 +1,14 @@
 'use client';
 
-import { CashForm, HistoryForm, HoldingForm, RecordDateForm, TradeForm, WatchForm } from './forms';
+import { useState } from 'react';
+import { CashForm, HistoryForm, HoldingForm, PositionSizingForm, RecordDateForm, TradeForm, WatchForm } from './forms';
 import { AssetsView, MobileTabs, PortfolioPdfReport, ShareView } from './panels';
 import { JournalView, PortfolioView, WatchView } from './views';
 import { usePortfolioApp } from './usePortfolioApp';
 
 export default function OpenPage() {
   const app = usePortfolioApp();
+  const [showSizingForm, setShowSizingForm] = useState(false);
   const {
     ready,
     user,
@@ -53,6 +55,9 @@ export default function OpenPage() {
     earnings,
     loadingEarnings,
     sharePayload,
+    tickerMemos,
+    saveTickerMemo,
+    benchData,
     pdfPayload,
     rows,
     summary,
@@ -112,6 +117,7 @@ export default function OpenPage() {
               <button onClick={() => { setEditingHolding(null); setShowHoldingForm(true); }} className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-white">
                 종목 추가
               </button>
+              <button onClick={() => setShowSizingForm(true)} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub hover:text-text">포지션 계산</button>
               <button onClick={makeShareUrl} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub hover:text-text">공유</button>
               <button onClick={exportPdfReport} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub hover:text-text">PDF</button>
               <button onClick={exportBackup} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub hover:text-text">백업</button>
@@ -171,6 +177,8 @@ export default function OpenPage() {
               earnings={earnings}
               loadingEarnings={loadingEarnings}
               onRefreshEarnings={refreshEarnings}
+              tickerMemos={tickerMemos}
+              onSaveMemo={saveTickerMemo}
             />
           )}
           {tab === 'assets' && (
@@ -183,6 +191,7 @@ export default function OpenPage() {
               rate={rate}
               onEditHistory={(entry) => { setEditingHistory(entry); setShowHistoryForm(true); }}
               onDeleteHistory={deleteHistory}
+              benchData={benchData}
             />
           )}
           {tab === 'watchlist' && (
@@ -198,6 +207,8 @@ export default function OpenPage() {
               earnings={earnings}
               loadingEarnings={loadingEarnings}
               onRefreshEarnings={refreshEarnings}
+              tickerMemos={tickerMemos}
+              onSaveMemo={saveTickerMemo}
               onExportTradingView={() => {
                 const text = watch.map((item) => item.ticker).filter(Boolean).join(',');
                 if (!text) {
@@ -223,6 +234,7 @@ export default function OpenPage() {
         </div>
       )}
 
+      {showSizingForm && <PositionSizingForm totalAsset={summary.totalAsset} onClose={() => setShowSizingForm(false)} />}
       {showHoldingForm && <HoldingForm item={editingHolding} onClose={() => setShowHoldingForm(false)} onSave={saveHolding} />}
       {showWatchForm && <WatchForm item={editingWatch} onClose={() => setShowWatchForm(false)} onSave={saveWatch} />}
       {showTradeForm && <TradeForm item={editingTrade} onClose={() => setShowTradeForm(false)} onSave={saveTrade} />}

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   colorClass,
   earningsSymbolMatches,
@@ -100,6 +101,7 @@ export function AssetsView({
   rate,
   onEditHistory,
   onDeleteHistory,
+  benchData = [],
 }: {
   history: HistoryEntry[];
   rows: AssetRow[];
@@ -109,6 +111,7 @@ export function AssetsView({
   rate: number;
   onEditHistory: (entry: HistoryEntry) => void;
   onDeleteHistory: (date: string) => void;
+  benchData?: { date: string; price: number }[];
 }) {
   const donutRows: DonutRow[] = [
     ...rows.map((row) => ({
@@ -126,7 +129,7 @@ export function AssetsView({
   return (
     <section className="grid gap-4 lg:grid-cols-[1fr_380px]">
       <div className="space-y-4">
-        <AssetTrendChart history={sortedHistory} krw={krw} rate={rate} />
+        <AssetTrendChart history={sortedHistory} krw={krw} rate={rate} benchData={benchData} />
         <div className="rounded-xl border border-border bg-card p-4">
         <h2 className="font-bold">자산 기록</h2>
         <div className="mt-4 overflow-x-auto rounded-lg border border-border">
@@ -223,7 +226,7 @@ function AssetDonut({ rows, totalAsset, krw, rate }: { rows: DonutRow[]; totalAs
   );
 }
 
-function AssetTrendChart({ history, krw, rate }: { history: HistoryEntry[]; krw: boolean; rate: number }) {
+function AssetTrendChart({ history, krw, rate, benchData = [] }: { history: HistoryEntry[]; krw: boolean; rate: number; benchData?: { date: string; price: number }[] }) {
   if (history.length < 2) {
     return (
       <div className="rounded-xl border border-border bg-card p-4">
@@ -249,6 +252,24 @@ function AssetTrendChart({ history, krw, rate }: { history: HistoryEntry[]; krw:
   };
   const xOf = (index: number) => paddingX + (index / Math.max(history.length - 1, 1)) * (width - paddingX - paddingTop);
   const makePoints = (key: 'totalValue' | 'stockValue' | 'cashValue') => history.map((item, index) => point(item[key], index)).join(' ');
+
+  // S&P500 벤치마크 라인: 첫 기록일 기준으로 정규화
+  const benchMap = new Map(benchData.map((b) => [b.date, b.price]));
+  function findBenchPrice(date: string) {
+    if (benchMap.has(date)) return benchMap.get(date)!;
+    const before = [...benchMap.entries()].filter(([d]) => d <= date).sort((a, b) => b[0].localeCompare(a[0]))[0];
+    return before ? before[1] : null;
+  }
+  const benchPoints = history.map((h) => findBenchPrice(h.date));
+  const benchBaseline = benchPoints[0];
+  const baseValue = history[0]?.totalValue ?? 1;
+  const benchSvgPoints = benchBaseline
+    ? history.map((_, i) => {
+        const bp = benchPoints[i];
+        const val = bp != null ? baseValue * (bp / benchBaseline) : null;
+        return val != null ? point(val, i) : null;
+      }).filter(Boolean).join(' ')
+    : null;
   const latest = history[history.length - 1];
   const labelIndices = history.length <= 6
     ? history.map((_, i) => i)
@@ -278,6 +299,7 @@ function AssetTrendChart({ history, krw, rate }: { history: HistoryEntry[]; krw:
               </g>
             );
           })}
+          {benchSvgPoints && <polyline points={benchSvgPoints} fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="6 3" strokeLinecap="round" strokeLinejoin="round" />}
           <polyline points={makePoints('totalValue')} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           <polyline points={makePoints('stockValue')} fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           <polyline points={makePoints('cashValue')} fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -291,6 +313,7 @@ function AssetTrendChart({ history, krw, rate }: { history: HistoryEntry[]; krw:
         <span><b className="text-brand">━</b> 총자산</span>
         <span><b className="text-emerald-600">━</b> 주식</span>
         <span><b className="text-amber-500">━</b> 예수금</span>
+        {benchSvgPoints && <span><b className="text-slate-400">╌</b> S&amp;P500 (동기)</span>}
       </div>
     </div>
   );
@@ -300,10 +323,14 @@ export function TickerDetail({
   ticker,
   theme = 'light',
   earnings = [],
+  memo = '',
+  onSaveMemo,
 }: {
   ticker: string;
   theme?: 'light' | 'dark';
   earnings?: EarningsItem[];
+  memo?: string;
+  onSaveMemo?: (text: string) => void;
 }) {
   if (!ticker) {
     return (
@@ -333,8 +360,61 @@ export function TickerDetail({
             <TickerEarningsSummary ticker={ticker} earnings={earnings} />
           </div>
         )}
+        {onSaveMemo && (
+          <div className="border-t border-border p-4">
+            <TickerMemo memo={memo} onSave={onSaveMemo} />
+          </div>
+        )}
       </div>
     </section>
+  );
+}
+
+function TickerMemo({ memo, onSave }: { memo: string; onSave: (text: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(memo);
+  function handleSave() {
+    onSave(draft);
+    setEditing(false);
+  }
+  function handleEdit() {
+    setDraft(memo);
+    setEditing(true);
+  }
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <h3 className="text-sm font-bold">메모</h3>
+        {!editing && (
+          <button onClick={handleEdit} className="text-xs font-semibold text-brand hover:underline">
+            {memo ? '편집' : '작성'}
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <div className="space-y-2">
+          <textarea
+            className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-brand resize-none"
+            rows={4}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="이 종목에 대한 메모를 입력하세요..."
+            autoFocus
+          />
+          <div className="flex gap-2">
+            <button onClick={handleSave} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-white">저장</button>
+            <button onClick={() => setEditing(false)} className="rounded-lg border border-border px-3 py-1.5 text-xs font-bold text-sub">취소</button>
+          </div>
+        </div>
+      ) : (
+        <div
+          onClick={handleEdit}
+          className={`min-h-[60px] cursor-text rounded-lg border border-border bg-bg px-3 py-2 text-sm ${memo ? 'text-text whitespace-pre-wrap' : 'text-sub'}`}
+        >
+          {memo || '메모를 작성하려면 클릭하세요...'}
+        </div>
+      )}
+    </div>
   );
 }
 

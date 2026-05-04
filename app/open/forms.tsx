@@ -81,9 +81,52 @@ export function TradeForm({
         <Field label="단가" required><input className={inputClass()} type="number" step="0.01" value={form.price || ''} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} /></Field>
         <Field label="수수료" optional><input className={inputClass()} type="number" step="0.01" value={form.fee || ''} onChange={(e) => setForm({ ...form, fee: Number(e.target.value) })} /></Field>
         <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={sync} disabled={!!item} onChange={(e) => setSync(e.target.checked)} /> 보유 종목과 예수금에 반영</label>
+        <Field label="전략" optional>
+          <input list="strategy-list" className={inputClass()} value={form.strategy ?? ''} placeholder="예: 브레이크아웃, 눌림목..." onChange={(e) => setForm({ ...form, strategy: e.target.value })} />
+          <datalist id="strategy-list">
+            {['브레이크아웃', '눌림목', '반등매수', '추세추종', '역추세', '실적플레이'].map(s => <option key={s} value={s} />)}
+          </datalist>
+        </Field>
         <Field label="메모" optional><input className={inputClass()} value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></Field>
         <button className="rounded-lg bg-brand px-4 py-2 font-bold text-white sm:col-span-2">저장</button>
       </form>
+    </Modal>
+  );
+}
+
+export function PositionSizingForm({ totalAsset, onClose }: { totalAsset: number; onClose: () => void }) {
+  const [accountSize, setAccountSize] = useState(totalAsset > 0 ? totalAsset.toFixed(2) : '');
+  const [riskPct, setRiskPct] = useState('1');
+  const [price, setPrice] = useState('');
+  const [stopLoss, setStopLoss] = useState('');
+
+  const account = Number(accountSize) || 0;
+  const risk = Number(riskPct) || 0;
+  const p = Number(price) || 0;
+  const sl = Number(stopLoss) || 0;
+  const riskAmount = account * (risk / 100);
+  const priceDiff = p - sl;
+  const shares = priceDiff > 0 ? Math.floor(riskAmount / priceDiff) : 0;
+  const positionValue = shares * p;
+  const positionPct = account > 0 ? (positionValue / account) * 100 : 0;
+
+  return (
+    <Modal title="포지션 사이징 계산기" onClose={onClose}>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="총 자산 ($)"><input className={inputClass()} type="number" step="0.01" value={accountSize} onChange={(e) => setAccountSize(e.target.value)} /></Field>
+        <Field label="리스크 비율 (%)"><input className={inputClass()} type="number" step="0.1" min="0.1" max="100" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} /></Field>
+        <Field label="매수 가격 ($)"><input className={inputClass()} type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
+        <Field label="손절 가격 ($)"><input className={inputClass()} type="number" step="0.01" value={stopLoss} onChange={(e) => setStopLoss(e.target.value)} /></Field>
+      </div>
+      <div className={`mt-4 rounded-xl border border-border bg-bg p-4 ${shares > 0 ? '' : 'opacity-40'}`}>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div><div className="text-xs font-semibold text-sub">리스크 금액</div><div className="mt-1 font-bold text-rose-600">${riskAmount.toFixed(0)}</div></div>
+          <div><div className="text-xs font-semibold text-sub">매수 수량</div><div className="mt-1 text-xl font-extrabold text-brand">{shares > 0 ? `${shares}주` : '-'}</div></div>
+          <div><div className="text-xs font-semibold text-sub">포지션 금액</div><div className="mt-1 font-bold">{shares > 0 ? `$${positionValue.toFixed(0)}` : '-'}</div></div>
+          <div><div className="text-xs font-semibold text-sub">포지션 비중</div><div className="mt-1 font-bold">{shares > 0 ? `${positionPct.toFixed(1)}%` : '-'}</div></div>
+        </div>
+      </div>
+      <button onClick={onClose} className="mt-3 w-full rounded-lg border border-border py-2 text-sm font-bold">닫기</button>
     </Modal>
   );
 }

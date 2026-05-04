@@ -12,13 +12,15 @@ const ALLOWED = new Set<string>([
   'quote',
   'company-news',
   'calendar/earnings',
+  'stock/candle',
 ]);
 
 // CDN 캐시 TTL (Vercel edge가 자동으로 인식). 초 단위.
 const TTL: Record<string, number> = {
-  'quote': 30,            // 시세는 짧게
-  'company-news': 300,    // 뉴스 5분
-  'calendar/earnings': 1800, // 어닝 캘린더 30분
+  'quote': 30,
+  'company-news': 300,
+  'calendar/earnings': 1800,
+  'stock/candle': 3600,   // 캔들 데이터 1시간
 };
 
 async function verify(req: NextRequest): Promise<{ uid: string } | null> {

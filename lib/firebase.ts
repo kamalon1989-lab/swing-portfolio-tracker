@@ -50,6 +50,7 @@ export interface LegacyPortfolio {
   j?: JournalItem[];      // journal (매매기록)
   hi?: HistoryEntry[];    // history (일별 기록)
   c?: number;             // cash
+  m?: Record<string, string>; // ticker memos
   k?: string | null;      // (Phase 3에서 제거 예정) finnhub api key
 }
 
@@ -81,6 +82,7 @@ export interface JournalItem {
   price: number;
   fee?: number;
   note?: string;
+  strategy?: string;
 }
 
 export interface HistoryEntry {

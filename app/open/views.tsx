@@ -45,6 +45,8 @@ export function PortfolioView(props: {
   earnings: EarningsItem[];
   loadingEarnings: boolean;
   onRefreshEarnings: () => void;
+  tickerMemos: Record<string, string>;
+  onSaveMemo: (ticker: string, text: string) => void;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('value');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -71,16 +73,21 @@ export function PortfolioView(props: {
   const holdingEarnings = props.earnings.filter((item) =>
     Array.from(holdingTickers).some((ticker) => earningsSymbolMatches(ticker, item.symbol))
   );
+  const maxRiskLoss = props.rows.reduce((sum, r) => {
+    if (!r.price || !r.stopLoss || r.price <= r.stopLoss) return sum;
+    return sum + (r.price - r.stopLoss) * r.shares;
+  }, 0);
   const cards = [
     ['주식 평가금액', money(props.summary.stockValue, props.krw, props.rate), `매수 ${money(props.summary.totalCost, props.krw, props.rate)}`, 'text-brand'],
     ['누적 손익', money(props.summary.totalPnl, props.krw, props.rate), pct(props.summary.totalPnlPct), colorClass(props.summary.totalPnl)],
     ['오늘 손익', money(props.summary.dayPnl, props.krw, props.rate), '실시간 시세 기준', colorClass(props.summary.dayPnl)],
     ['예수금', money(props.cash, props.krw, props.rate), '클릭해서 수정', 'text-brand'],
     ['총 자산', money(props.summary.totalAsset, props.krw, props.rate), '주식 + 예수금', 'text-brand'],
+    ...(maxRiskLoss > 0 ? [['손절 시 최대손실', `-${money(maxRiskLoss, props.krw, props.rate)}`, `총 자산의 ${props.summary.totalAsset > 0 ? ((maxRiskLoss / props.summary.totalAsset) * 100).toFixed(1) : 0}%`, 'text-rose-600']] : []),
   ];
   return (
     <section className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-5">
+      <div className={`grid gap-3 ${cards.length === 6 ? 'sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6' : 'md:grid-cols-5'}`}>
         {cards.map(([label, value, sub, color]) => (
           <button key={label} type="button" onClick={label === '예수금' ? props.onEditCash : undefined} className={`rounded-xl border border-border bg-card p-4 text-left shadow-sm ${label === '예수금' ? 'cursor-pointer hover:border-brand/50' : 'cursor-default'}`}>
             <div className="text-xs font-semibold uppercase text-sub">{label}</div>
@@ -107,6 +114,7 @@ export function PortfolioView(props: {
               <SortableTh label={`수익률${sortMark('pnlPct')}`} onClick={() => setSort('pnlPct')} />
               <SortableTh label={`오늘${sortMark('dayPct')}`} onClick={() => setSort('dayPct')} />
               <th className="px-3 py-3 text-right">목표/손절</th>
+              <th className="px-3 py-3 text-right">R:R</th>
               <SortableTh label={`비중${sortMark('weight')}`} onClick={() => setSort('weight')} />
               <th className="px-3 py-3 text-right">관리</th>
             </tr>
@@ -129,6 +137,7 @@ export function PortfolioView(props: {
                 <td className={`px-3 py-3 text-right font-semibold ${colorClass(r.pnlPct)}`}>{r.price ? pct(r.pnlPct) : '-'}</td>
                 <td className={`px-3 py-3 text-right ${colorClass(r.dayPct)}`}>{r.price ? pct(r.dayPct) : '-'}</td>
                 <td className="px-3 py-3 text-right text-xs text-sub"><TargetStopCell row={r} /></td>
+                <td className="px-3 py-3 text-right text-xs font-semibold"><RRCell row={r} /></td>
                 <td className="px-3 py-3 text-right">{r.weight.toFixed(1)}%</td>
                 <td className="px-3 py-3 text-right">
                   <button onClick={() => props.onSelectTicker(r.ticker)} className="no-print mr-2 text-slate-700">상세</button>
@@ -142,7 +151,7 @@ export function PortfolioView(props: {
         {!props.rows.length && <div className="p-12 text-center text-sm text-sub">보유 종목이 없습니다.</div>}
       </div>
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <TickerDetail ticker={props.selectedTicker} theme={props.theme} earnings={holdingEarnings} />
+        <TickerDetail ticker={props.selectedTicker} theme={props.theme} earnings={holdingEarnings} memo={props.tickerMemos[props.selectedTicker] ?? ''} onSaveMemo={props.selectedTicker ? (text) => props.onSaveMemo(props.selectedTicker, text) : undefined} />
         <EarningsPanel earnings={holdingEarnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
       </div>
     </section>
@@ -247,6 +256,8 @@ export function WatchView({
   loadingEarnings,
   onRefreshEarnings,
   onExportTradingView,
+  tickerMemos,
+  onSaveMemo,
 }: {
   watch: WatchItem[];
   prices: PriceMap;
@@ -260,6 +271,8 @@ export function WatchView({
   loadingEarnings: boolean;
   onRefreshEarnings: () => void;
   onExportTradingView: () => void;
+  tickerMemos: Record<string, string>;
+  onSaveMemo: (ticker: string, text: string) => void;
 }) {
   const watchTickers = new Set(watch.map((item) => item.ticker));
   const watchEarnings = earnings.filter((item) => Array.from(watchTickers).some((ticker) => earningsSymbolMatches(ticker, item.symbol)));
@@ -295,7 +308,7 @@ export function WatchView({
         {!watch.length && <div className="p-12 text-center text-sm text-sub">관심 종목이 없습니다.</div>}
       </div>
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <TickerDetail ticker={selectedTicker} theme={theme} earnings={watchEarnings} />
+        <TickerDetail ticker={selectedTicker} theme={theme} earnings={watchEarnings} memo={tickerMemos[selectedTicker] ?? ''} onSaveMemo={selectedTicker ? (text) => onSaveMemo(selectedTicker, text) : undefined} />
         <EarningsPanel earnings={watchEarnings} loading={loadingEarnings} onRefresh={onRefreshEarnings} />
       </div>
     </section>
@@ -313,30 +326,57 @@ function JournalSummary({ journal }: { journal: JournalItem[] }) {
   });
   let realizedPnl = 0;
   let wins = 0;
+  const strategyStats: Record<string, { wins: number; total: number }> = {};
   sells.forEach((j) => {
     const buy = totalBuyMap[j.ticker];
     if (!buy || !buy.shares) return;
     const avgCost = buy.cost / buy.shares;
     const pnlAmt = (j.price - avgCost) * j.shares - (j.fee || 0);
     realizedPnl += pnlAmt;
-    if (pnlAmt > 0) wins++;
+    const isWin = pnlAmt > 0;
+    if (isWin) wins++;
+    if (j.strategy) {
+      if (!strategyStats[j.strategy]) strategyStats[j.strategy] = { wins: 0, total: 0 };
+      strategyStats[j.strategy].total++;
+      if (isWin) strategyStats[j.strategy].wins++;
+    }
   });
   const winRate = sells.length ? (wins / sells.length) * 100 : 0;
   const totalBuy = journal.filter((j) => j.action === 'buy').reduce((s, j) => s + j.shares * j.price, 0);
   const totalSell = sells.reduce((s, j) => s + j.shares * j.price, 0);
+  const strategyEntries = Object.entries(strategyStats).sort((a, b) => b[1].total - a[1].total);
   return (
-    <div className="grid gap-3 sm:grid-cols-4">
-      {[
-        ['총 매수 금액', usd(totalBuy), 'text-blue-600'],
-        ['총 매도 금액', usd(totalSell), 'text-rose-600'],
-        ['실현 손익', usd(realizedPnl), colorClass(realizedPnl)],
-        ['매도 승률', `${winRate.toFixed(0)}% (${wins}/${sells.length})`, colorClass(winRate - 50)],
-      ].map(([label, value, color]) => (
-        <div key={label} className="rounded-xl border border-border bg-card p-4">
-          <div className="text-xs font-semibold uppercase text-sub">{label}</div>
-          <div className={`mt-2 text-lg font-extrabold ${color}`}>{value}</div>
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-4">
+        {[
+          ['총 매수 금액', usd(totalBuy), 'text-blue-600'],
+          ['총 매도 금액', usd(totalSell), 'text-rose-600'],
+          ['실현 손익', usd(realizedPnl), colorClass(realizedPnl)],
+          ['매도 승률', `${winRate.toFixed(0)}% (${wins}/${sells.length})`, colorClass(winRate - 50)],
+        ].map(([label, value, color]) => (
+          <div key={label} className="rounded-xl border border-border bg-card p-4">
+            <div className="text-xs font-semibold uppercase text-sub">{label}</div>
+            <div className={`mt-2 text-lg font-extrabold ${color}`}>{value}</div>
+          </div>
+        ))}
+      </div>
+      {strategyEntries.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="text-xs font-semibold uppercase text-sub mb-3">전략별 승률</div>
+          <div className="flex flex-wrap gap-2">
+            {strategyEntries.map(([strategy, { wins: w, total }]) => {
+              const wr = (w / total) * 100;
+              return (
+                <div key={strategy} className="rounded-lg border border-border px-3 py-2 text-sm">
+                  <span className="font-semibold">{strategy}</span>
+                  <span className={`ml-2 font-bold ${colorClass(wr - 50)}`}>{wr.toFixed(0)}%</span>
+                  <span className="ml-1 text-xs text-sub">({w}/{total})</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -347,14 +387,109 @@ export function JournalView({ journal, onAdd, onEdit, onDelete }: { journal: Jou
     <section className="space-y-4">
       <button onClick={onAdd} className="no-print rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">거래 추가</button>
       <JournalSummary journal={journal} />
+      <MonthlyPnlCalendar journal={journal} />
       <div className="overflow-x-auto rounded-xl border border-border bg-card">
-        <table className="w-full min-w-[780px] text-sm">
-          <thead className="bg-bg text-xs text-sub"><tr><th className="px-3 py-3 text-left">날짜</th><th className="px-3 py-3">구분</th><th className="px-3 py-3 text-left">티커</th><th className="px-3 py-3 text-right">수량</th><th className="px-3 py-3 text-right">단가</th><th className="px-3 py-3 text-right">금액</th><th className="px-3 py-3 text-left">메모</th><th className="px-3 py-3 text-right">관리</th></tr></thead>
-          <tbody>{sorted.map((j) => <tr key={j.id} className="border-t border-border"><td className="px-3 py-3">{j.date}</td><td className="px-3 py-3 text-center"><span className={`rounded-full px-2 py-1 text-xs font-bold ${j.action === 'buy' ? 'bg-blue-50 text-blue-700' : 'bg-rose-50 text-rose-700'}`}>{j.action === 'buy' ? '매수' : '매도'}</span></td><td className="px-3 py-3 font-bold">{j.ticker}</td><td className="px-3 py-3 text-right">{j.shares}</td><td className="px-3 py-3 text-right">{usd(j.price)}</td><td className={`px-3 py-3 text-right font-semibold ${j.action === 'buy' ? 'text-blue-600' : 'text-rose-600'}`}>{usd(j.shares * j.price)}</td><td className="px-3 py-3 text-sub">{j.note || '-'}</td><td className="px-3 py-3 text-right"><button onClick={() => onEdit(j)} className="no-print mr-2 text-brand">수정</button><button onClick={() => onDelete(j.id)} className="no-print text-rose-600">삭제</button></td></tr>)}</tbody>
+        <table className="w-full min-w-[900px] text-sm">
+          <thead className="bg-bg text-xs text-sub"><tr><th className="px-3 py-3 text-left">날짜</th><th className="px-3 py-3">구분</th><th className="px-3 py-3 text-left">티커</th><th className="px-3 py-3 text-right">수량</th><th className="px-3 py-3 text-right">단가</th><th className="px-3 py-3 text-right">금액</th><th className="px-3 py-3 text-left">전략</th><th className="px-3 py-3 text-left">메모</th><th className="px-3 py-3 text-right">관리</th></tr></thead>
+          <tbody>{sorted.map((j) => <tr key={j.id} className="border-t border-border"><td className="px-3 py-3">{j.date}</td><td className="px-3 py-3 text-center"><span className={`rounded-full px-2 py-1 text-xs font-bold ${j.action === 'buy' ? 'bg-blue-50 text-blue-700' : 'bg-rose-50 text-rose-700'}`}>{j.action === 'buy' ? '매수' : '매도'}</span></td><td className="px-3 py-3 font-bold">{j.ticker}</td><td className="px-3 py-3 text-right">{j.shares}</td><td className="px-3 py-3 text-right">{usd(j.price)}</td><td className={`px-3 py-3 text-right font-semibold ${j.action === 'buy' ? 'text-blue-600' : 'text-rose-600'}`}>{usd(j.shares * j.price)}</td><td className="px-3 py-3">{j.strategy ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{j.strategy}</span> : <span className="text-sub">-</span>}</td><td className="px-3 py-3 text-sub">{j.note || '-'}</td><td className="px-3 py-3 text-right"><button onClick={() => onEdit(j)} className="no-print mr-2 text-brand">수정</button><button onClick={() => onDelete(j.id)} className="no-print text-rose-600">삭제</button></td></tr>)}</tbody>
         </table>
         {!journal.length && <div className="p-12 text-center text-sm text-sub">거래 기록이 없습니다.</div>}
       </div>
     </section>
+  );
+}
+
+function MonthlyPnlCalendar({ journal }: { journal: JournalItem[] }) {
+  const [month, setMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  const { pnlByDate, activityByDate } = useMemo(() => {
+    const sortedJ = [...journal].sort((a, b) => a.date.localeCompare(b.date));
+    const avgCostMap: Record<string, { cost: number; shares: number }> = {};
+    const pnlByDate: Record<string, number> = {};
+    const activityByDate: Record<string, 'buy' | 'sell' | 'both'> = {};
+    for (const j of sortedJ) {
+      if (j.action === 'buy') {
+        if (!avgCostMap[j.ticker]) avgCostMap[j.ticker] = { cost: 0, shares: 0 };
+        avgCostMap[j.ticker].cost += j.shares * j.price;
+        avgCostMap[j.ticker].shares += j.shares;
+        if (!activityByDate[j.date]) activityByDate[j.date] = 'buy';
+        else if (activityByDate[j.date] === 'sell') activityByDate[j.date] = 'both';
+      } else {
+        const entry = avgCostMap[j.ticker];
+        const avgCost = entry?.shares ? entry.cost / entry.shares : j.price;
+        const pnl = (j.price - avgCost) * j.shares - (j.fee || 0);
+        pnlByDate[j.date] = (pnlByDate[j.date] ?? 0) + pnl;
+        if (!activityByDate[j.date]) activityByDate[j.date] = 'sell';
+        else activityByDate[j.date] = 'both';
+      }
+    }
+    return { pnlByDate, activityByDate };
+  }, [journal]);
+
+  const year = Number(month.slice(0, 4));
+  const mon = Number(month.slice(5, 7));
+  const firstDay = new Date(year, mon - 1, 1).getDay();
+  const daysInMonth = new Date(year, mon, 0).getDate();
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  const prevMonth = () => setMonth((m) => {
+    const d = new Date(m + '-01T00:00:00');
+    d.setMonth(d.getMonth() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const nextMonth = () => setMonth((m) => {
+    const d = new Date(m + '-01T00:00:00');
+    d.setMonth(d.getMonth() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-bold">월별 손익 달력</h3>
+        <div className="flex items-center gap-2">
+          <button onClick={prevMonth} className="rounded border border-border px-2 py-1 text-xs font-bold">◀</button>
+          <span className="min-w-[70px] text-center text-sm font-semibold">{month}</span>
+          <button onClick={nextMonth} className="rounded border border-border px-2 py-1 text-xs font-bold">▶</button>
+        </div>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-xs">
+        {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
+          <div key={d} className="py-1 text-center font-semibold text-sub">{d}</div>
+        ))}
+        {cells.map((d, i) => {
+          if (d === null) return <div key={`pad-${i}`} />;
+          const dateStr = `${month}-${String(d).padStart(2, '0')}`;
+          const pnl = pnlByDate[dateStr];
+          const activity = activityByDate[dateStr];
+          let bg = '';
+          if (pnl !== undefined && pnl > 0) bg = 'bg-emerald-50 text-emerald-800';
+          else if (pnl !== undefined && pnl < 0) bg = 'bg-rose-50 text-rose-800';
+          else if (activity === 'buy') bg = 'bg-blue-50 text-blue-700';
+          const isToday = dateStr === todayStr;
+          return (
+            <div key={d} className={`flex min-h-[44px] flex-col items-center justify-start gap-0.5 rounded p-1 ${bg} ${isToday ? 'ring-1 ring-brand' : ''}`}>
+              <span className={`font-semibold leading-none ${isToday ? 'text-brand' : ''}`}>{d}</span>
+              {pnl !== undefined && (
+                <span className="text-[9px] font-bold leading-none">{pnl >= 0 ? '+' : ''}{pnl.toFixed(0)}</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-3 text-xs text-sub">
+        <span><b className="text-emerald-600">■</b> 매도 익절</span>
+        <span><b className="text-rose-600">■</b> 매도 손절</span>
+        <span><b className="text-blue-500">■</b> 매수만</span>
+      </div>
+    </div>
   );
 }
 
@@ -380,4 +515,14 @@ function TargetStopCell({ row }: { row: HoldingRow }) {
       {stopHit && <span className="inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700">손절 이탈</span>}
     </div>
   );
+}
+
+function RRCell({ row }: { row: HoldingRow }) {
+  if (!row.price || !row.targetPrice || !row.stopLoss) return <span className="text-sub">-</span>;
+  const risk = row.price - row.stopLoss;
+  const reward = row.targetPrice - row.price;
+  if (risk <= 0 || reward <= 0) return <span className="text-sub">-</span>;
+  const rr = reward / risk;
+  const color = rr >= 2 ? 'text-emerald-600' : rr >= 1 ? 'text-amber-500' : 'text-rose-600';
+  return <span className={color}>{rr.toFixed(1)}R</span>;
 }

@@ -41,6 +41,7 @@ export const K = {
   watch: 'ptf_watch',
   krw: 'ptf_krw',
   theme: 'ptf_theme',
+  memos: 'ptf_memos',
 };
 
 export const demoHoldings: HoldingItem[] = [

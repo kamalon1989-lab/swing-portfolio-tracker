@@ -67,6 +67,8 @@ export function usePortfolioApp() {
   const [loadingEarnings, setLoadingEarnings] = useState(false);
   const [sharePayload, setSharePayload] = useState<SharePayload | null>(null);
   const [pdfPayload, setPdfPayload] = useState<SharePayload | null>(null);
+  const [tickerMemos, setTickerMemos] = useState<Record<string, string>>({});
+  const [benchData, setBenchData] = useState<{ date: string; price: number }[]>([]);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cloudLoaded = useRef(false);
 
@@ -106,6 +108,7 @@ export function usePortfolioApp() {
     setPrices(readJson<PriceMap>(K.prices, {}));
     setKrw(readJson<boolean>(K.krw, false));
     setTheme(readJson<'light' | 'dark'>(K.theme, 'light'));
+    setTickerMemos(readJson<Record<string, string>>(K.memos, {}));
     setReady(true);
 
     const unsub = onAuthStateChanged(getFirebaseAuth(), async (nextUser) => {
@@ -123,11 +126,13 @@ export function usePortfolioApp() {
           setJournal(data.j ?? []);
           setHistory(normalizeHistory(data.hi));
           setCash(data.c ?? 0);
+          if (data.m) setTickerMemos(data.m);
           writeJson(K.holdings, data.h ?? []);
           writeJson(K.watch, data.w ?? []);
           writeJson(K.journal, data.j ?? []);
           writeJson(K.history, data.hi ?? []);
           writeJson(K.cash, data.c ?? 0);
+          if (data.m) writeJson(K.memos, data.m);
           notify('Firebase 데이터를 불러왔습니다');
         }
       } catch {
@@ -159,6 +164,12 @@ export function usePortfolioApp() {
   }, [ready, demo, user, holdings.length, watch.length, sharePayload]);
 
   useEffect(() => {
+    if (!ready || sharePayload || demo) return;
+    if (user && history.length >= 2) refreshBenchmark();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, user, history.length, sharePayload]);
+
+  useEffect(() => {
     if (!ready || demo) return;
     writeJson(K.holdings, holdings);
     writeJson(K.watch, watch);
@@ -167,7 +178,8 @@ export function usePortfolioApp() {
     writeJson(K.cash, cash);
     writeJson(K.prices, prices);
     writeJson(K.krw, krw);
-  }, [ready, demo, holdings, watch, journal, history, cash, prices, krw]);
+    writeJson(K.memos, tickerMemos);
+  }, [ready, demo, holdings, watch, journal, history, cash, prices, krw, tickerMemos]);
 
   useEffect(() => {
     if (!pdfPayload) return;
@@ -187,13 +199,14 @@ export function usePortfolioApp() {
           j: journal,
           hi: history,
           c: cash,
+          m: tickerMemos,
         });
         setStatus('Firebase 동기화 완료');
       } catch {
         setStatus('Firebase 동기화 실패');
       }
     }, 1200);
-  }, [user, demo, holdings, watch, journal, history, cash]);
+  }, [user, demo, holdings, watch, journal, history, cash, tickerMemos]);
 
   const rows = useMemo(() => {
     let totalValue = 0;
@@ -483,6 +496,35 @@ export function usePortfolioApp() {
     return [ticker];
   }
 
+  function saveTickerMemo(ticker: string, text: string) {
+    setTickerMemos((prev) => ({ ...prev, [ticker]: text }));
+  }
+
+  async function refreshBenchmark() {
+    const current = getFirebaseAuth().currentUser;
+    if (!current) return;
+    const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date));
+    if (!sorted.length) return;
+    const from = Math.floor(new Date(sorted[0].date + 'T00:00:00').getTime() / 1000);
+    const to = Math.floor(Date.now() / 1000);
+    try {
+      const token = await current.getIdToken();
+      const res = await fetch(`/api/finnhub/stock/candle?symbol=SPY&resolution=D&from=${from}&to=${to}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.s !== 'ok' || !Array.isArray(data.c)) return;
+      const candles: { date: string; price: number }[] = (data.t as number[]).map((t: number, i: number) => ({
+        date: new Date(t * 1000).toISOString().slice(0, 10),
+        price: data.c[i] as number,
+      }));
+      setBenchData(candles);
+    } catch {
+      // 벤치마크 조회 실패는 무시
+    }
+  }
+
   return {
     ready,
     user,
@@ -531,6 +573,10 @@ export function usePortfolioApp() {
     earnings,
     loadingEarnings,
     sharePayload,
+    tickerMemos,
+    benchData,
+    saveTickerMemo,
+    refreshBenchmark,
     pdfPayload,
     setPdfPayload,
     rows,
