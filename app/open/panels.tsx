@@ -5,7 +5,10 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  Cell,
   Line,
+  Pie,
+  PieChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -265,35 +268,57 @@ export function AssetsView({
     <section className="grid gap-4 lg:grid-cols-[1fr_380px]">
       <div className="space-y-4">
         <AssetTrendChart history={sortedHistory} krw={krw} rate={rate} benchData={benchData} />
-        <div className="rounded-xl border border-border bg-card p-4">
-        <h2 className="font-bold">자산 기록</h2>
-        <div className="mt-4 overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-bg text-xs text-sub"><tr><th className="px-3 py-2 text-left">날짜</th><th className="px-3 py-2 text-right">총 자산</th><th className="px-3 py-2 text-right">주식</th><th className="px-3 py-2 text-right">예수금</th><th className="px-3 py-2 text-right">변화율</th><th className="px-3 py-2 text-right">관리</th></tr></thead>
-            <tbody>{history.map((h, index) => {
-              const next = history[index + 1];
-              const change = next?.totalValue ? ((h.totalValue - next.totalValue) / next.totalValue) * 100 : 0;
+        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-bold text-slate-100">자산 기록</h2>
+            <p className="mt-1 text-xs text-slate-400">기록별 총자산, 주식, 예수금과 변화율</p>
+          </div>
+          <div className="rounded-full border border-slate-700 px-3 py-1 text-xs font-bold text-slate-300">
+            {sortedHistory.length}건
+          </div>
+        </div>
+        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-800">
+          <table className="w-full min-w-[720px] text-sm">
+            <thead className="bg-slate-900 text-xs text-slate-400"><tr><th className="px-3 py-3 text-left">날짜</th><th className="px-3 py-3 text-right">총 자산</th><th className="px-3 py-3 text-right">주식</th><th className="px-3 py-3 text-right">예수금</th><th className="px-3 py-3 text-right">변화율</th><th className="px-3 py-3 text-right">관리</th></tr></thead>
+            <tbody>{sortedHistory.map((h, index) => {
+              const prev = sortedHistory[index - 1];
+              const change = prev?.totalValue ? ((h.totalValue - prev.totalValue) / prev.totalValue) * 100 : 0;
               return (
-                <tr key={h.date} className="border-t border-border">
-                  <td className="px-3 py-2">{h.date}</td>
-                  <td className="px-3 py-2 text-right">{money(h.totalValue, krw, rate)}</td>
-                  <td className="px-3 py-2 text-right">{money(h.stockValue, krw, rate)}</td>
-                  <td className="px-3 py-2 text-right">{money(h.cashValue, krw, rate)}</td>
-                  <td className={`px-3 py-2 text-right font-semibold ${colorClass(change)}`}>{next ? pct(change) : '-'}</td>
-                  <td className="px-3 py-2 text-right">
-                    <button onClick={() => onEditHistory(h)} className="mr-2 text-brand text-xs">수정</button>
-                    <button onClick={() => onDeleteHistory(h.date)} className="text-rose-600 text-xs">삭제</button>
+                <tr key={h.date} className="border-t border-slate-800 hover:bg-slate-900/70">
+                  <td className="px-3 py-3 font-semibold text-slate-200">{h.date}</td>
+                  <td className="px-3 py-3 text-right font-bold text-slate-100">{money(h.totalValue, krw, rate)}</td>
+                  <td className="px-3 py-3 text-right text-slate-300">{money(h.stockValue, krw, rate)}</td>
+                  <td className="px-3 py-3 text-right text-slate-300">{money(h.cashValue, krw, rate)}</td>
+                  <td className="px-3 py-3 text-right">
+                    {prev ? (
+                      <span className={`rounded-full px-2 py-1 text-xs font-bold ${change >= 0 ? 'bg-emerald-400/10 text-emerald-300' : 'bg-rose-400/10 text-rose-300'}`}>
+                        {pct(change)}
+                      </span>
+                    ) : <span className="text-slate-500">-</span>}
+                  </td>
+                  <td className="px-3 py-3 text-right">
+                    <button onClick={() => onEditHistory(h)} className="mr-2 rounded-md border border-slate-700 px-2 py-1 text-xs font-bold text-sky-300 hover:border-sky-400">수정</button>
+                    <button onClick={() => onDeleteHistory(h.date)} className="rounded-md border border-rose-400/30 px-2 py-1 text-xs font-bold text-rose-300 hover:bg-rose-400/10">삭제</button>
                   </td>
                 </tr>
               );
             })}</tbody>
           </table>
-          {!history.length && <div className="p-10 text-center text-sm text-sub">포트폴리오 탭에서 오늘 기록을 저장하면 여기에 쌓입니다.</div>}
+          {!sortedHistory.length && <div className="p-10 text-center text-sm text-slate-400">포트폴리오 탭에서 오늘 기록을 저장하면 여기에 쌓입니다.</div>}
         </div>
       </div>
       </div>
-      <div className="rounded-xl border border-border bg-card p-4">
-        <h2 className="font-bold">자산 비중</h2>
+      <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-bold text-slate-100">자산 비중</h2>
+            <p className="mt-1 text-xs text-slate-400">보유 종목과 현금 비중</p>
+          </div>
+          <div className="rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-xs font-bold text-sky-200">
+            {money(summary.totalAsset, krw, rate)}
+          </div>
+        </div>
         <div className="mt-4 flex justify-center">
           <AssetDonut rows={donutRows} totalAsset={summary.totalAsset} krw={krw} rate={rate} />
         </div>
@@ -303,16 +328,16 @@ export function AssetsView({
               <span className="flex min-w-0 items-center gap-2">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: chartColors[index % chartColors.length] }} />
                 <span className="min-w-0">
-                  <span className="font-bold text-text">{row.ticker}</span>
-                  {row.name && <span className="ml-1 text-xs text-sub">{row.name}</span>}
+                  <span className="font-bold text-slate-100">{row.ticker}</span>
+                  {row.name && <span className="ml-1 text-xs text-slate-500">{row.name}</span>}
                 </span>
               </span>
-              <strong>{row.weight.toFixed(1)}%</strong>
+              <strong className="text-slate-200">{row.weight.toFixed(1)}%</strong>
             </div>
           ))}
-          <div className="flex justify-between"><span className="text-sub">주식</span><strong>{money(summary.stockValue, krw, rate)}</strong></div>
-          <div className="flex justify-between"><span className="text-sub">예수금</span><strong>{money(cash, krw, rate)}</strong></div>
-          <div className="flex justify-between border-t border-border pt-2"><span className="text-sub">총 자산</span><strong>{money(summary.totalAsset, krw, rate)}</strong></div>
+          <div className="flex justify-between text-slate-400"><span>주식</span><strong className="text-slate-200">{money(summary.stockValue, krw, rate)}</strong></div>
+          <div className="flex justify-between text-slate-400"><span>예수금</span><strong className="text-slate-200">{money(cash, krw, rate)}</strong></div>
+          <div className="flex justify-between border-t border-slate-800 pt-2 text-slate-400"><span>총 자산</span><strong className="text-slate-100">{money(summary.totalAsset, krw, rate)}</strong></div>
         </div>
       </div>
     </section>
@@ -323,41 +348,44 @@ export function AssetsView({
 function AssetDonut({ rows, totalAsset, krw, rate }: { rows: DonutRow[]; totalAsset: number; krw: boolean; rate: number }) {
   if (!rows.length) {
     return (
-      <div className="grid h-48 w-48 place-items-center rounded-full bg-bg text-center text-sm font-bold text-sub">
+      <div className="grid h-56 w-full place-items-center rounded-xl bg-slate-900 text-center text-sm font-bold text-slate-400">
         기록 없음
       </div>
     );
   }
-  let cursor = 0;
-  const segments = rows.map((row, index) => {
-    const start = cursor;
-    const end = cursor + row.weight;
-    cursor = end;
-    return `${chartColors[index % chartColors.length]} ${start}% ${end}%`;
-  });
   return (
-    <div className="relative h-52 w-52 rounded-full" style={{ background: `conic-gradient(${segments.join(', ')})` }}>
-      <div className="absolute inset-10 grid place-items-center rounded-full bg-card text-center">
-        <div>
-          <div className="text-xs text-sub">총 자산</div>
-          <div className="text-lg font-extrabold text-brand">{money(totalAsset, krw, rate)}</div>
+    <div className="h-72 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Tooltip
+            formatter={(value, name) => [`${Number(value).toFixed(1)}%`, name]}
+            contentStyle={{ background: '#020617', border: '1px solid #1e293b', borderRadius: 12, color: '#e2e8f0' }}
+            labelStyle={{ color: '#cbd5e1' }}
+          />
+          <Pie
+            data={rows}
+            dataKey="weight"
+            nameKey="ticker"
+            innerRadius="58%"
+            outerRadius="82%"
+            paddingAngle={2}
+            labelLine={false}
+            label={({ name, percent }) => percent && percent > 0.055 ? name : ''}
+            stroke="#020617"
+            strokeWidth={3}
+          >
+            {rows.map((row, index) => (
+              <Cell key={row.ticker} fill={chartColors[index % chartColors.length]} />
+            ))}
+          </Pie>
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="-mt-44 grid place-items-center text-center pointer-events-none">
+        <div className="rounded-full bg-slate-950/80 px-4 py-3">
+          <div className="text-xs text-slate-500">총 자산</div>
+          <div className="text-lg font-extrabold text-sky-300">{money(totalAsset, krw, rate)}</div>
         </div>
       </div>
-      {rows.slice(0, 5).map((row, index) => {
-        const angle = rows.slice(0, index).reduce((sum, item) => sum + item.weight, 0) + row.weight / 2;
-        const rad = (angle / 100) * Math.PI * 2 - Math.PI / 2;
-        const x = 50 + Math.cos(rad) * 39;
-        const y = 50 + Math.sin(rad) * 39;
-        return (
-          <span
-            key={row.ticker}
-            className="absolute -translate-x-1/2 -translate-y-1/2 rounded bg-card/90 px-1.5 py-0.5 text-[10px] font-bold shadow-sm"
-            style={{ left: `${x}%`, top: `${y}%` }}
-          >
-            {row.ticker}
-          </span>
-        );
-      })}
     </div>
   );
 }
@@ -365,31 +393,12 @@ function AssetDonut({ rows, totalAsset, krw, rate }: { rows: DonutRow[]; totalAs
 function AssetTrendChart({ history, krw, rate, benchData = [] }: { history: HistoryEntry[]; krw: boolean; rate: number; benchData?: { date: string; price: number }[] }) {
   if (history.length < 2) {
     return (
-      <div className="rounded-xl border border-border bg-card p-4">
-        <h2 className="font-bold">자산 추이</h2>
-        <div className="mt-4 rounded-lg bg-bg p-10 text-center text-sm text-sub">두 번 이상 자산 기록을 저장하면 추이가 표시됩니다.</div>
+      <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
+        <h2 className="font-bold text-slate-100">자산 추이</h2>
+        <div className="mt-4 rounded-xl bg-slate-900 p-10 text-center text-sm text-slate-400">두 번 이상 자산 기록을 저장하면 추이가 표시됩니다.</div>
       </div>
     );
   }
-  const width = 720;
-  const height = 260;
-  const paddingX = 72;
-  const paddingTop = 28;
-  const paddingBottom = 44;
-  const values = history.flatMap((item) => [item.totalValue, item.stockValue, item.cashValue]);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const chartH = height - paddingTop - paddingBottom;
-  const point = (value: number, index: number) => {
-    const x = paddingX + (index / Math.max(history.length - 1, 1)) * (width - paddingX - paddingTop);
-    const y = paddingTop + chartH - ((value - min) / span) * chartH;
-    return `${x},${y}`;
-  };
-  const xOf = (index: number) => paddingX + (index / Math.max(history.length - 1, 1)) * (width - paddingX - paddingTop);
-  const makePoints = (key: 'totalValue' | 'stockValue' | 'cashValue') => history.map((item, index) => point(item[key], index)).join(' ');
-
-  // S&P500 벤치마크 라인: 첫 기록일 기준으로 정규화
   const benchMap = new Map(benchData.map((b) => [b.date, b.price]));
   function findBenchPrice(date: string) {
     if (benchMap.has(date)) return benchMap.get(date)!;
@@ -399,57 +408,68 @@ function AssetTrendChart({ history, krw, rate, benchData = [] }: { history: Hist
   const benchPoints = history.map((h) => findBenchPrice(h.date));
   const benchBaseline = benchPoints[0];
   const baseValue = history[0]?.totalValue ?? 1;
-  const benchSvgPoints = benchBaseline
-    ? history.map((_, i) => {
-        const bp = benchPoints[i];
-        const val = bp != null ? baseValue * (bp / benchBaseline) : null;
-        return val != null ? point(val, i) : null;
-      }).filter(Boolean).join(' ')
-    : null;
+  const chartData = history.map((item, index) => {
+    const benchmark = benchBaseline
+      ? (() => {
+        const bp = benchPoints[index];
+        return bp != null ? baseValue * (bp / benchBaseline) : undefined;
+      })()
+      : undefined;
+    return {
+      label: item.date.slice(5),
+      date: item.date,
+      totalValue: item.totalValue,
+      stockValue: item.stockValue,
+      cashValue: item.cashValue,
+      benchmark,
+    };
+  });
   const latest = history[history.length - 1];
-  const labelIndices = history.length <= 6
-    ? history.map((_, i) => i)
-    : [0, Math.floor(history.length / 3), Math.floor(history.length * 2 / 3), history.length - 1];
-  const shownLabels = new Set(labelIndices);
+  const moneyTick = (value: number) => krw && rate ? `₩${Math.round(value * rate / 10000).toLocaleString('ko-KR')}만` : compactUsd(value);
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-bold">자산 추이</h2>
-          <p className="mt-1 text-xs text-sub">총자산, 주식, 예수금 흐름</p>
+          <h2 className="font-bold text-slate-100">자산 추이</h2>
+          <p className="mt-1 text-xs text-slate-400">총자산, 주식, 예수금 흐름</p>
         </div>
-        <div className="text-right text-sm">
-          <div className="font-bold">{money(latest.totalValue, krw, rate)}</div>
-          <div className="text-xs text-sub">{latest.date}</div>
+        <div className="rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-right text-xs font-bold text-sky-200">
+          <div>{money(latest.totalValue, krw, rate)}</div>
+          <div className="font-medium text-sky-100/60">{latest.date}</div>
         </div>
       </div>
-      <div className="mt-4 overflow-x-auto">
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-72 min-w-[620px] rounded-lg bg-bg">
-          {[0, 1, 2, 3].map((line) => {
-            const y = paddingTop + line * (chartH / 3);
-            const value = max - (line / 3) * span;
-            return (
-              <g key={line}>
-                <text x="12" y={y + 4} className="fill-sub text-[11px]" fontSize="11">{money(value, krw, rate)}</text>
-                <line x1={paddingX} x2={width - paddingTop} y1={y} y2={y} stroke="rgb(var(--border))" strokeWidth="1" />
-              </g>
-            );
-          })}
-          {benchSvgPoints && <polyline points={benchSvgPoints} fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="6 3" strokeLinecap="round" strokeLinejoin="round" />}
-          <polyline points={makePoints('totalValue')} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-          <polyline points={makePoints('stockValue')} fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-          <polyline points={makePoints('cashValue')} fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-          {history.map((item, i) => shownLabels.has(i) ? (
-            <text key={item.date} x={xOf(i)} y={height - 8} textAnchor="middle" fontSize="10" className="fill-sub">{item.date.slice(5)}</text>
-          ) : null)}
-          <line x1={paddingX} x2={width - paddingTop} y1={paddingTop + chartH} y2={paddingTop + chartH} stroke="rgb(var(--border))" strokeWidth="1" />
-        </svg>
+      <div className="mt-4 h-72">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData} margin={{ top: 12, right: 18, bottom: 8, left: 0 }}>
+            <defs>
+              <linearGradient id="assetTotal" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#38bdf8" stopOpacity={0.24} />
+                <stop offset="100%" stopColor="#38bdf8" stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
+            <XAxis dataKey="label" minTickGap={24} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={{ stroke: '#334155' }} tickLine={false} />
+            <YAxis tickFormatter={moneyTick} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={58} />
+            <Tooltip
+              formatter={(value, name) => {
+                const labels: Record<string, string> = { totalValue: '총자산', stockValue: '주식', cashValue: '예수금', benchmark: 'S&P500 동기' };
+                return [money(Number(value), krw, rate), labels[String(name)] ?? String(name)];
+              }}
+              contentStyle={{ background: '#020617', border: '1px solid #1e293b', borderRadius: 12, color: '#e2e8f0' }}
+              labelStyle={{ color: '#cbd5e1' }}
+            />
+            <Area type="monotone" dataKey="totalValue" stroke="#38bdf8" strokeWidth={3} fill="url(#assetTotal)" dot={{ r: 3, fill: '#38bdf8' }} />
+            <Line type="monotone" dataKey="stockValue" stroke="#22c55e" strokeWidth={2.5} dot={false} />
+            <Line type="monotone" dataKey="cashValue" stroke="#f59e0b" strokeWidth={2.5} dot={false} />
+            {benchBaseline && <Line type="monotone" dataKey="benchmark" stroke="#94a3b8" strokeWidth={2} strokeDasharray="7 6" dot={false} connectNulls />}
+          </AreaChart>
+        </ResponsiveContainer>
       </div>
-      <div className="mt-3 flex flex-wrap gap-3 text-xs text-sub">
-        <span><b className="text-brand">━</b> 총자산</span>
-        <span><b className="text-emerald-600">━</b> 주식</span>
-        <span><b className="text-amber-500">━</b> 예수금</span>
-        {benchSvgPoints && <span><b className="text-slate-400">╌</b> S&amp;P500 (동기)</span>}
+      <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-400">
+        <span><b className="text-sky-400">━</b> 총자산</span>
+        <span><b className="text-emerald-400">━</b> 주식</span>
+        <span><b className="text-amber-400">━</b> 예수금</span>
+        {benchBaseline && <span><b className="text-slate-400">╌</b> S&amp;P500 동기</span>}
       </div>
     </div>
   );
@@ -697,7 +717,7 @@ function buildGoalAnalysis(goalConfig: GoalConfig, history: HistoryEntry[], curr
     : stats.monthlyRate >= requiredMonthlyRate - tolerance
       ? 'steady'
       : 'fast';
-  const horizon = Math.min(Math.max(targetMonths + 12, (etaMonths ?? targetMonths) + 6, 18), 96);
+  const horizon = Math.min(Math.max(targetMonths + 3, 6), 96);
   const sortedHistory = [...history]
     .filter((item) => item.date && item.totalValue > 0)
     .sort((a, b) => a.date.localeCompare(b.date));

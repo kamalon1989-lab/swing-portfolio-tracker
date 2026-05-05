@@ -1,6 +1,19 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import type { HoldingItem, JournalItem, WatchItem } from '@/lib/firebase';
 import { EarningsPanel, TickerDetail } from './panels';
 import {
@@ -28,6 +41,19 @@ type SortKey = 'ticker' | 'price' | 'shares' | 'avgCost' | 'value' | 'pnl' | 'pn
 type SortDir = 'asc' | 'desc';
 type AlertLevel = 'danger' | 'warning' | 'success';
 type PriceAlert = { ticker: string; label: string; message: string; level: AlertLevel };
+
+function compactUsd(value: number) {
+  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `$${Math.round(value / 1_000)}K`;
+  return `$${Math.round(value).toLocaleString('en-US')}`;
+}
+
+const darkTooltip = {
+  background: '#020617',
+  border: '1px solid #1e293b',
+  borderRadius: 12,
+  color: '#e2e8f0',
+};
 
 export function PortfolioView(props: {
   rows: HoldingRow[];
@@ -73,6 +99,7 @@ export function PortfolioView(props: {
   const holdingEarnings = props.earnings.filter((item) =>
     Array.from(holdingTickers).some((ticker) => earningsSymbolMatches(ticker, item.symbol))
   );
+  const selectedRow = props.rows.find((row) => row.ticker === props.selectedTicker) ?? props.rows[0];
   const maxRiskLoss = props.rows.reduce((sum, r) => {
     if (!r.price || !r.stopLoss || r.price <= r.stopLoss) return sum;
     return sum + (r.price - r.stopLoss) * r.shares;
@@ -151,10 +178,61 @@ export function PortfolioView(props: {
         {!props.rows.length && <div className="p-12 text-center text-sm text-sub">보유 종목이 없습니다.</div>}
       </div>
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <TickerDetail ticker={props.selectedTicker} theme={props.theme} earnings={holdingEarnings} memo={props.tickerMemos[props.selectedTicker] ?? props.rows.find((r) => r.ticker === props.selectedTicker)?.note ?? ''} onSaveMemo={props.selectedTicker ? (text) => props.onSaveMemo(props.selectedTicker, text) : undefined} />
+        <div className="space-y-4">
+          <PositionPathChart row={selectedRow} />
+          <TickerDetail ticker={props.selectedTicker} theme={props.theme} earnings={holdingEarnings} memo={props.tickerMemos[props.selectedTicker] ?? props.rows.find((r) => r.ticker === props.selectedTicker)?.note ?? ''} onSaveMemo={props.selectedTicker ? (text) => props.onSaveMemo(props.selectedTicker, text) : undefined} />
+        </div>
         <EarningsPanel earnings={holdingEarnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
       </div>
     </section>
+  );
+}
+
+function PositionPathChart({ row }: { row?: HoldingRow }) {
+  if (!row || !row.price || (!row.targetPrice && !row.stopLoss)) return null;
+  const lower = Math.min(row.stopLoss || row.price, row.avgCost, row.price, row.targetPrice || row.price);
+  const upper = Math.max(row.stopLoss || row.price, row.avgCost, row.price, row.targetPrice || row.price);
+  const span = Math.max(upper - lower, 1);
+  const data = [
+    { label: '손절', value: row.stopLoss || lower, type: 'stop' },
+    { label: '평단', value: row.avgCost, type: 'avg' },
+    { label: '현재', value: row.price, type: 'now' },
+    { label: '목표', value: row.targetPrice || upper, type: 'target' },
+  ].filter((item) => item.value > 0).map((item) => ({
+    ...item,
+    floor: Math.max(0, lower - span * 0.12),
+  }));
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-bold text-slate-100">{row.ticker} 가격 경로</h3>
+          <p className="mt-1 text-xs text-slate-400">손절가, 평단, 현재가, 목표가의 위치</p>
+        </div>
+        <div className={`rounded-full border px-3 py-1 text-xs font-bold ${row.pnl >= 0 ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200' : 'border-rose-400/30 bg-rose-400/10 text-rose-200'}`}>
+          {pct(row.pnlPct)}
+        </div>
+      </div>
+      <div className="mt-4 h-52">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 12, right: 18, bottom: 8, left: 0 }}>
+            <defs>
+              <linearGradient id={`positionPath-${row.ticker}`} x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#38bdf8" stopOpacity={0.22} />
+                <stop offset="100%" stopColor="#38bdf8" stopOpacity={0.03} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
+            <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={{ stroke: '#334155' }} tickLine={false} />
+            <YAxis tickFormatter={compactUsd} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={58} domain={['dataMin', 'dataMax']} />
+            <Tooltip formatter={(value) => [usd(Number(value)), '가격']} contentStyle={darkTooltip} labelStyle={{ color: '#cbd5e1' }} />
+            {row.stopLoss ? <ReferenceLine y={row.stopLoss} stroke="#fb7185" strokeDasharray="5 5" /> : null}
+            {row.targetPrice ? <ReferenceLine y={row.targetPrice} stroke="#34d399" strokeDasharray="5 5" /> : null}
+            <Area type="monotone" dataKey="value" stroke="#38bdf8" strokeWidth={3} fill={`url(#positionPath-${row.ticker})`} dot={{ r: 4, fill: '#38bdf8' }} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 }
 
@@ -284,6 +362,7 @@ export function WatchView({
         <button onClick={onExportTradingView} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">TradingView 복사</button>
       </div>
       <PriceAlerts alerts={alerts} />
+      <WatchDistanceChart watch={watch} prices={prices} />
       <div className="overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full min-w-[680px] text-sm">
           <thead className="bg-bg text-xs text-sub"><tr><th className="px-3 py-3 text-left">티커</th><th className="px-3 py-3 text-right">현재가</th><th className="px-3 py-3 text-right">목표 진입가</th><th className="px-3 py-3 text-right">거리</th><th className="px-3 py-3 text-right">오늘</th><th className="px-3 py-3 text-left">메모</th><th className="px-3 py-3 text-right">관리</th></tr></thead>
@@ -312,6 +391,60 @@ export function WatchView({
         <EarningsPanel earnings={watchEarnings} loading={loadingEarnings} onRefresh={onRefreshEarnings} />
       </div>
     </section>
+  );
+}
+
+function WatchDistanceChart({ watch, prices }: { watch: WatchItem[]; prices: PriceMap }) {
+  const data = watch
+    .map((item) => {
+      const price = prices[item.ticker]?.price;
+      if (!price || !item.targetBuy) return null;
+      const distance = ((price - item.targetBuy) / price) * 100;
+      return {
+        ticker: item.ticker,
+        distance,
+        price,
+        targetBuy: item.targetBuy,
+      };
+    })
+    .filter((item): item is { ticker: string; distance: number; price: number; targetBuy: number } => Boolean(item))
+    .sort((a, b) => a.distance - b.distance);
+  if (!data.length) return null;
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-bold text-slate-100">관심 종목 진입 거리</h3>
+          <p className="mt-1 text-xs text-slate-400">현재가가 목표 진입가까지 얼마나 남았는지 비교</p>
+        </div>
+        <div className="rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-xs font-bold text-sky-200">
+          {data.length}개 추적
+        </div>
+      </div>
+      <div className="mt-4 h-64">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 12, right: 18, bottom: 8, left: 0 }}>
+            <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
+            <XAxis dataKey="ticker" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={{ stroke: '#334155' }} tickLine={false} />
+            <YAxis tickFormatter={(value) => `${Number(value).toFixed(0)}%`} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={48} />
+            <Tooltip
+              formatter={(value, name, item) => {
+                const payload = item.payload as { price: number; targetBuy: number };
+                return [`${Number(value).toFixed(1)}% · 현재 ${usd(payload.price)} / 목표 ${usd(payload.targetBuy)}`, '진입 거리'];
+              }}
+              contentStyle={darkTooltip}
+              labelStyle={{ color: '#cbd5e1' }}
+            />
+            <ReferenceLine y={0} stroke="#34d399" strokeDasharray="5 5" label={{ value: '도달', fill: '#86efac', fontSize: 11, position: 'insideTopRight' }} />
+            <Bar dataKey="distance" radius={[8, 8, 0, 0]}>
+              {data.map((item) => (
+                <Cell key={item.ticker} fill={item.distance <= 0 ? '#34d399' : item.distance <= 5 ? '#f59e0b' : '#38bdf8'} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 }
 
@@ -387,6 +520,7 @@ export function JournalView({ journal, onAdd, onEdit, onDelete }: { journal: Jou
     <section className="space-y-4">
       <button onClick={onAdd} className="no-print rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">거래 추가</button>
       <JournalSummary journal={journal} />
+      <JournalFlowChart journal={journal} />
       <MonthlyPnlCalendar journal={journal} />
       <div className="overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full min-w-[900px] text-sm">
@@ -396,6 +530,80 @@ export function JournalView({ journal, onAdd, onEdit, onDelete }: { journal: Jou
         {!journal.length && <div className="p-12 text-center text-sm text-sub">거래 기록이 없습니다.</div>}
       </div>
     </section>
+  );
+}
+
+function JournalFlowChart({ journal }: { journal: JournalItem[] }) {
+  const data = useMemo(() => {
+    const sortedJ = [...journal].sort((a, b) => a.date.localeCompare(b.date));
+    const avgCostMap: Record<string, { cost: number; shares: number }> = {};
+    const months: Record<string, { month: string; buy: number; sell: number; realized: number }> = {};
+    for (const item of sortedJ) {
+      const month = item.date.slice(0, 7);
+      if (!months[month]) months[month] = { month, buy: 0, sell: 0, realized: 0 };
+      const amount = item.shares * item.price;
+      if (item.action === 'buy') {
+        months[month].buy += amount;
+        if (!avgCostMap[item.ticker]) avgCostMap[item.ticker] = { cost: 0, shares: 0 };
+        avgCostMap[item.ticker].cost += amount;
+        avgCostMap[item.ticker].shares += item.shares;
+      } else {
+        months[month].sell += amount;
+        const entry = avgCostMap[item.ticker];
+        const avgCost = entry?.shares ? entry.cost / entry.shares : item.price;
+        months[month].realized += (item.price - avgCost) * item.shares - (item.fee || 0);
+        if (entry) {
+          const usedCost = avgCost * item.shares;
+          entry.cost = Math.max(0, entry.cost - usedCost);
+          entry.shares = Math.max(0, entry.shares - item.shares);
+        }
+      }
+    }
+    return Object.values(months).slice(-12);
+  }, [journal]);
+  if (!data.length) return null;
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-bold text-slate-100">매매 흐름</h3>
+          <p className="mt-1 text-xs text-slate-400">월별 매수·매도 금액과 실현 손익</p>
+        </div>
+        <div className="rounded-full border border-slate-700 px-3 py-1 text-xs font-bold text-slate-300">
+          최근 {data.length}개월
+        </div>
+      </div>
+      <div className="mt-4 h-72">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 12, right: 18, bottom: 8, left: 0 }}>
+            <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
+            <XAxis dataKey="month" tickFormatter={(value) => String(value).slice(2)} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={{ stroke: '#334155' }} tickLine={false} />
+            <YAxis tickFormatter={compactUsd} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={58} />
+            <Tooltip
+              formatter={(value, name) => {
+                const labels: Record<string, string> = { buy: '매수', sell: '매도', realized: '실현 손익' };
+                return [usd(Number(value)), labels[String(name)] ?? String(name)];
+              }}
+              contentStyle={darkTooltip}
+              labelStyle={{ color: '#cbd5e1' }}
+            />
+            <ReferenceLine y={0} stroke="#334155" />
+            <Bar dataKey="buy" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="sell" fill="#fb7185" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="realized" radius={[8, 8, 0, 0]}>
+              {data.map((item) => (
+                <Cell key={item.month} fill={item.realized >= 0 ? '#34d399' : '#f43f5e'} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-400">
+        <span><b className="text-blue-400">■</b> 매수</span>
+        <span><b className="text-rose-400">■</b> 매도</span>
+        <span><b className="text-emerald-400">■</b> 실현 손익</span>
+      </div>
+    </div>
   );
 }
 
