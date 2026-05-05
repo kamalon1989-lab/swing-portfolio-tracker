@@ -2,6 +2,17 @@
 
 import { useMemo, useState } from 'react';
 import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Line,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import {
   colorClass,
   earningsSymbolMatches,
   pct,
@@ -10,33 +21,11 @@ import {
   type EarningsItem,
   type GoalConfig,
   type HistoryEntry,
-  type InvestStyle,
   type SharePayload,
   type Tab,
 } from './model';
 
 /* ─── Goal tracker helpers ─────────────────────────────────── */
-
-function getStyleRates(style: InvestStyle, customRate?: number): [number, number, number] {
-  const base = (customRate ?? 10) / 100;
-  switch (style) {
-    case '공격형': return [0.30, 0.18, 0.08];
-    case '중립형': return [0.20, 0.12, 0.05];
-    case '보수형': return [0.12, 0.07, 0.03];
-    case '자유형': return [Math.min(base * 1.5, 0.5), base, Math.max(base * 0.5, 0.005)];
-  }
-}
-
-function projectScenario(startVal: number, monthly: number, annualRate: number, months: number): number[] {
-  const r = Math.pow(1 + annualRate, 1 / 12) - 1;
-  const vals: number[] = [];
-  let v = startVal;
-  for (let i = 0; i < months; i++) {
-    v = v * (1 + r) + monthly;
-    vals.push(v);
-  }
-  return vals;
-}
 
 function calcRequiredMonthlyRate(start: number, monthly: number, target: number, months: number): number | null {
   if (months <= 0 || target <= 0) return null;
@@ -51,10 +40,97 @@ function calcRequiredMonthlyRate(start: number, monthly: number, target: number,
   return (lo + hi) / 2;
 }
 
-function fmtShort(n: number): string {
-  if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(n) >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
-  return `$${n.toFixed(0)}`;
+function monthDiff(from: Date, to: Date) {
+  return Math.max(0, (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth()));
+}
+
+function addMonths(date: Date, months: number) {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  return next;
+}
+
+function monthLabel(date: Date) {
+  return `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
+}
+
+function shortMonthLabel(date: Date) {
+  return `${String(date.getFullYear()).slice(2)}/${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function compactUsd(value: number) {
+  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `$${Math.round(value / 1_000)}K`;
+  return `$${Math.round(value).toLocaleString('en-US')}`;
+}
+
+function formatSignedMonths(months: number) {
+  if (months === 0) return '목표 일정과 동일';
+  return months > 0 ? `목표 대비 ${months}개월 지연` : `목표 대비 ${Math.abs(months)}개월 빠름`;
+}
+
+function projectValue(start: number, monthly: number, monthlyRate: number, months: number) {
+  let value = start;
+  for (let i = 0; i < months; i++) value = value * (1 + monthlyRate) + monthly;
+  return value;
+}
+
+function findEtaMonths(start: number, monthly: number, monthlyRate: number, target: number, maxMonths = 360) {
+  if (start >= target) return 0;
+  let value = start;
+  for (let i = 1; i <= maxMonths; i++) {
+    value = value * (1 + monthlyRate) + monthly;
+    if (value >= target) return i;
+  }
+  return null;
+}
+
+function calcRequiredMonthlyDeposit(start: number, monthly: number, monthlyRate: number, target: number, months: number) {
+  if (months <= 0) return 0;
+  const projectedWithoutExtra = projectValue(start, monthly, monthlyRate, months);
+  if (projectedWithoutExtra >= target) return 0;
+  const factor = Math.abs(monthlyRate) < 0.000001
+    ? months
+    : ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate);
+  return Math.max(0, (target - projectedWithoutExtra) / Math.max(factor, 1));
+}
+
+function monthlyReturnStats(history: HistoryEntry[], currentAsset: number, now: Date) {
+  const sorted = [...history]
+    .filter((item) => item.date && item.totalValue > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const latestHistory = sorted[sorted.length - 1];
+  const latest = latestHistory ?? { date: now.toISOString().slice(0, 10), totalValue: currentAsset };
+  const latestDate = new Date(`${latest.date}T00:00:00`);
+  const recentCutoff = new Date(latestDate);
+  recentCutoff.setMonth(recentCutoff.getMonth() - 3);
+  const recent = sorted.filter((item) => new Date(`${item.date}T00:00:00`) >= recentCutoff);
+  const sample = recent.length >= 2 ? recent : sorted.slice(-4);
+  if (sample.length < 2) {
+    return { monthlyRate: 0, volatility: 0.03, sampleMonths: 0, sampleCount: sample.length, returns: [] as number[] };
+  }
+  const first = sample[0];
+  const last = sample[sample.length - 1];
+  const firstDate = new Date(`${first.date}T00:00:00`);
+  const lastDate = new Date(`${last.date}T00:00:00`);
+  const months = Math.max((lastDate.getTime() - firstDate.getTime()) / (30.44 * 86400000), 0.1);
+  const monthlyRate = Math.pow(last.totalValue / first.totalValue, 1 / months) - 1;
+  const returns = sample.slice(1).map((item, index) => {
+    const prev = sample[index];
+    const prevDate = new Date(`${prev.date}T00:00:00`);
+    const itemDate = new Date(`${item.date}T00:00:00`);
+    const days = Math.max((itemDate.getTime() - prevDate.getTime()) / 86400000, 1);
+    return Math.pow(item.totalValue / prev.totalValue, 30.44 / days) - 1;
+  }).filter(Number.isFinite);
+  const avg = returns.reduce((sum, value) => sum + value, 0) / Math.max(returns.length, 1);
+  const variance = returns.reduce((sum, value) => sum + Math.pow(value - avg, 2), 0) / Math.max(returns.length, 1);
+  return {
+    monthlyRate: Number.isFinite(monthlyRate) ? monthlyRate : 0,
+    volatility: Math.max(Math.sqrt(variance), 0.015),
+    sampleMonths: months,
+    sampleCount: sample.length,
+    returns,
+  };
 }
 
 type AssetRow = {
@@ -576,243 +652,239 @@ function formatEarningsHour(hour?: string) {
 
 /* ─── 투자 목표 트래커 ─────────────────────────────────────── */
 
-function GoalScenarioChart({
-  currentAsset, targetAmount, history,
-  neutralProj, optimisticProj, conservativeProj,
-  totalMonths, now, krw, rate,
-  optimisticAchieveMonth, neutralAchieveMonth, conservativeAchieveMonth,
-}: {
-  currentAsset: number; targetAmount: number; history: HistoryEntry[];
-  neutralProj: number[]; optimisticProj: number[]; conservativeProj: number[];
-  totalMonths: number; now: Date; krw: boolean; rate: number;
-  optimisticAchieveMonth: number; neutralAchieveMonth: number; conservativeAchieveMonth: number;
-}) {
-  const W = 720, H = 260, PX = 70, PT = 20, PB = 46, PR = 16;
-  const chartW = W - PX - PR, chartH = H - PT - PB;
-  const histBack = 6;
-  const futureLen = Math.min(Math.max(totalMonths + 3, 6), 60);
-  const totalDisp = histBack + futureLen;
-  const xOf = (m: number) => PX + ((histBack + m) / totalDisp) * chartW;
+type PaceStatus = 'safe' | 'steady' | 'fast';
 
-  // All y values for range
-  const len = futureLen + 1;
-  const allVals = [
-    currentAsset, targetAmount,
-    ...optimisticProj.slice(0, len),
-    ...neutralProj.slice(0, len),
-    ...conservativeProj.slice(0, len),
-    ...history.map((h) => h.totalValue),
-  ].filter((v) => !isNaN(v));
-  const raw0 = Math.min(...allVals), raw1 = Math.max(...allVals);
-  const sp = raw1 - raw0 || 1;
-  const minV = raw0 - sp * 0.04, maxV = raw1 + sp * 0.08;
-  const vSp = maxV - minV;
-  const yOf = (v: number) => PT + chartH - ((Math.max(minV, Math.min(maxV, v)) - minV) / vSp) * chartH;
+type ForecastPoint = {
+  label: string;
+  date: string;
+  actual?: number;
+  trend?: number;
+  range?: [number, number];
+};
 
-  // Projection polyline (month 0 = now)
-  const projPts = (arr: number[]) =>
-    [[0, currentAsset] as [number, number], ...arr.slice(0, len).map((v, i) => [i + 1, v] as [number, number])]
-      .map(([m, v]) => `${xOf(m)},${yOf(v)}`).join(' ');
+type GoalAnalysis = {
+  now: Date;
+  targetDate: Date;
+  targetMonths: number;
+  dday: number;
+  achieveRate: number;
+  actualMonthlyRate: number;
+  requiredMonthlyRate: number | null;
+  volatility: number;
+  sampleMonths: number;
+  etaMonths: number | null;
+  etaDate: Date | null;
+  delayMonths: number | null;
+  paceStatus: PaceStatus;
+  forecastData: ForecastPoint[];
+  extraMonthlyDeposit: number;
+};
 
-  // History points
-  const histPts = history.map((h) => {
-    const d = new Date(h.date + 'T00:00:00');
-    const m = (d.getFullYear() - now.getFullYear()) * 12 + (d.getMonth() - now.getMonth());
-    return { m, v: h.totalValue };
-  }).filter(({ m }) => m >= -histBack && m <= 0).sort((a, b) => a.m - b.m);
-
-  // Y labels
-  const yLabels = [0, 1, 2, 3].map((i) => ({ y: PT + (i * chartH) / 3, val: maxV - (i / 3) * vSp }));
-
-  // X labels (every 3 months)
-  const xLabels: { x: number; lbl: string }[] = [];
-  for (let m = 0; m <= futureLen; m += 3) {
-    const d = new Date(now);
-    d.setMonth(d.getMonth() + m);
-    xLabels.push({ x: xOf(m), lbl: m === 0 ? '현재' : `${d.getFullYear().toString().slice(2)}/${String(d.getMonth() + 1).padStart(2, '0')}` });
-  }
-
-  const targetY = yOf(targetAmount);
-  const nowX = xOf(0);
-  const targetX = xOf(totalMonths);
-
-  function monthToStr(idx: number) {
-    const d = new Date(now); d.setMonth(d.getMonth() + idx + 1);
-    return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
-  }
-
-  const scenarios = [
-    { lbl: '낙관', color: '#16a34a', am: optimisticAchieveMonth, pts: projPts(optimisticProj), dash: '7 3' },
-    { lbl: '중립', color: '#2563eb', am: neutralAchieveMonth,    pts: projPts(neutralProj),    dash: undefined },
-    { lbl: '보수', color: '#e11d48', am: conservativeAchieveMonth, pts: projPts(conservativeProj), dash: '4 4' },
-  ];
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <h3 className="font-bold">시나리오별 예측 그래프</h3>
-      <div className="mt-3 overflow-x-auto">
-        <svg viewBox={`0 0 ${W} ${H}`} className="h-64 min-w-[600px] rounded-lg bg-bg">
-          {/* Grid lines + Y labels */}
-          {yLabels.map(({ y, val }, i) => (
-            <g key={i}>
-              <text x="6" y={y + 4} fontSize="10" className="fill-sub">{fmtShort(val)}</text>
-              <line x1={PX} x2={W - PR} y1={y} y2={y} stroke="rgb(var(--border))" strokeWidth="1" />
-            </g>
-          ))}
-          {/* Target horizontal line */}
-          <line x1={PX} x2={W - PR} y1={targetY} y2={targetY} stroke="#8b5cf6" strokeWidth="1.5" strokeDasharray="8 4" />
-          <text x={W - PR - 2} y={targetY - 4} fontSize="10" textAnchor="end" fill="#8b5cf6" fontWeight="600">목표 {fmtShort(targetAmount)}</text>
-          {/* Now vertical */}
-          <line x1={nowX} x2={nowX} y1={PT} y2={PT + chartH} stroke="rgb(var(--border))" strokeWidth="1.5" strokeDasharray="4 3" />
-          {/* Target date vertical */}
-          {targetX < W - PR && (
-            <line x1={targetX} x2={targetX} y1={PT} y2={PT + chartH} stroke="#8b5cf6" strokeWidth="1" strokeDasharray="3 4" opacity="0.5" />
-          )}
-          {/* Scenario lines */}
-          {scenarios.map(({ color, pts, dash }) => (
-            <polyline key={color} points={pts} fill="none" stroke={color} strokeWidth="2"
-              strokeDasharray={dash} strokeLinecap="round" strokeLinejoin="round" />
-          ))}
-          {/* Achievement dots on target line */}
-          {scenarios.map(({ color, am }) =>
-            am >= 0 && am < len ? (
-              <circle key={color} cx={xOf(am + 1)} cy={targetY} r={5} fill={color} stroke="rgb(var(--bg))" strokeWidth="2" />
-            ) : null
-          )}
-          {/* History line */}
-          {histPts.length >= 2 && (
-            <polyline points={histPts.map(({ m, v }) => `${xOf(m)},${yOf(v)}`).join(' ')}
-              fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-          )}
-          {histPts.map(({ m, v }) => (
-            <circle key={m} cx={xOf(m)} cy={yOf(v)} r={3} fill="#94a3b8" />
-          ))}
-          {/* X labels */}
-          {xLabels.map(({ x, lbl }) => (
-            <text key={lbl} x={x} y={H - 6} fontSize="10" textAnchor="middle" className="fill-sub">{lbl}</text>
-          ))}
-          <line x1={PX} x2={W - PR} y1={PT + chartH} y2={PT + chartH} stroke="rgb(var(--border))" strokeWidth="1" />
-        </svg>
-      </div>
-      {/* Legend + intersection summary */}
-      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-sub">
-        {scenarios.map(({ lbl, color, am }) => (
-          <span key={lbl} style={{ color }}><b>━</b> {lbl}: {am >= 0 ? monthToStr(am) + ' 달성' : '기간 초과'}</span>
-        ))}
-        {histPts.length > 0 && <span className="text-slate-400"><b>━</b> 실제 기록</span>}
-        <span className="text-violet-500"><b>╌</b> 목표</span>
-      </div>
-    </div>
-  );
+function buildGoalAnalysis(goalConfig: GoalConfig, history: HistoryEntry[], currentAsset: number): GoalAnalysis {
+  const now = new Date();
+  const targetDate = new Date(`${goalConfig.targetDate}T00:00:00`);
+  const targetMonths = Math.max(1, monthDiff(now, targetDate) || Math.ceil((targetDate.getTime() - now.getTime()) / (30.44 * 86400000)));
+  const dday = Math.ceil((targetDate.getTime() - now.getTime()) / 86400000);
+  const achieveRate = goalConfig.targetAmount > 0 ? Math.min((currentAsset / goalConfig.targetAmount) * 100, 100) : 0;
+  const stats = monthlyReturnStats(history, currentAsset, now);
+  const requiredMonthlyRate = calcRequiredMonthlyRate(currentAsset, goalConfig.monthlyContrib, goalConfig.targetAmount, targetMonths);
+  const etaMonths = findEtaMonths(currentAsset, goalConfig.monthlyContrib, stats.monthlyRate, goalConfig.targetAmount);
+  const etaDate = etaMonths === null ? null : addMonths(now, etaMonths);
+  const delayMonths = etaMonths === null ? null : etaMonths - targetMonths;
+  const tolerance = Math.max(0.002, Math.abs(requiredMonthlyRate ?? 0) * 0.12);
+  const paceStatus: PaceStatus = requiredMonthlyRate === null || stats.monthlyRate >= requiredMonthlyRate + tolerance
+    ? 'safe'
+    : stats.monthlyRate >= requiredMonthlyRate - tolerance
+      ? 'steady'
+      : 'fast';
+  const horizon = Math.min(Math.max(targetMonths + 12, (etaMonths ?? targetMonths) + 6, 18), 96);
+  const sortedHistory = [...history]
+    .filter((item) => item.date && item.totalValue > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const recentHistory = sortedHistory.slice(-12).map((item) => ({
+    label: shortMonthLabel(new Date(`${item.date}T00:00:00`)),
+    date: item.date,
+    actual: item.totalValue,
+  }));
+  const forecast = Array.from({ length: horizon + 1 }, (_, index) => {
+    const date = addMonths(now, index);
+    const trend = projectValue(currentAsset, goalConfig.monthlyContrib, stats.monthlyRate, index);
+    const cone = stats.volatility * 1.35 * Math.sqrt(index);
+    const lower = Math.max(0, trend * (1 - cone));
+    const upper = trend * (1 + cone);
+    return {
+      label: index === 0 ? '현재' : shortMonthLabel(date),
+      date: date.toISOString().slice(0, 10),
+      trend,
+      range: [lower, upper] as [number, number],
+      actual: index === 0 ? currentAsset : undefined,
+    };
+  });
+  const extraMonthlyDeposit = calcRequiredMonthlyDeposit(currentAsset, goalConfig.monthlyContrib, stats.monthlyRate, goalConfig.targetAmount, targetMonths);
+  return {
+    now,
+    targetDate,
+    targetMonths,
+    dday,
+    achieveRate,
+    actualMonthlyRate: stats.monthlyRate,
+    requiredMonthlyRate,
+    volatility: stats.volatility,
+    sampleMonths: stats.sampleMonths,
+    etaMonths,
+    etaDate,
+    delayMonths,
+    paceStatus,
+    forecastData: [...recentHistory, ...forecast],
+    extraMonthlyDeposit,
+  };
 }
 
-function RequiredReturnCard({
-  requiredAnnualRate, neutralRate, totalMonths, goalConfig, krw, rate,
+function GoalForecastChart({
+  data, targetAmount,
 }: {
-  requiredAnnualRate: number | null; neutralRate: number; totalMonths: number;
-  goalConfig: GoalConfig; krw: boolean; rate: number;
+  data: ForecastPoint[];
+  targetAmount: number;
 }) {
-  if (requiredAnnualRate === null) return null;
-  const pct100 = (requiredAnnualRate * 100);
-  const isAchieved = requiredAnnualRate <= 0;
-  const isHard = pct100 > 40;
-  const isMid = !isAchieved && !isHard && requiredAnnualRate > neutralRate;
-  const rColor = isAchieved ? 'text-emerald-600' : isHard ? 'text-rose-600' : isMid ? 'text-amber-500' : 'text-brand';
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <h3 className="font-bold">필요 수익률 역산기</h3>
-      <p className="mt-0.5 text-xs text-sub">{totalMonths}개월 이내 목표 달성 기준</p>
-      <div className="mt-4 flex items-end gap-2">
+    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-xs text-sub">필요 연수익률</div>
-          <div className={`mt-1 text-3xl font-extrabold ${rColor}`}>
-            {isAchieved ? '이미 달성 🎉' : `${pct100.toFixed(1)}%`}
-          </div>
+          <h3 className="font-bold text-slate-100">시나리오별 예측 그래프</h3>
+          <p className="mt-1 text-xs text-slate-400">과거 실제 기록 + 최근 페이스 연장선 + 변동성 예측 범위</p>
         </div>
-        {!isAchieved && (
-          <div className="mb-1.5 text-xs text-sub">
-            월 {((Math.pow(1 + requiredAnnualRate, 1 / 12) - 1) * 100).toFixed(2)}%
-          </div>
-        )}
+        <div className="rounded-full border border-violet-400/30 bg-violet-400/10 px-3 py-1 text-xs font-bold text-violet-200">
+          목표 {compactUsd(targetAmount)}
+        </div>
       </div>
-      {isHard && (
-        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-400">
-          ⚠️ 도전적인 목표입니다. 기한을 늘리거나 월 적립액을 높여보세요.<br />
-          <span className="mt-0.5 block text-sub">현재 적립액: {money(goalConfig.monthlyContrib, krw, rate)}/월</span>
-        </div>
-      )}
-      {!isAchieved && !isHard && (
-        <div className="mt-3 space-y-1.5 text-xs">
-          <div className="flex justify-between text-sub">
-            <span>{goalConfig.style} 중립 수익률</span>
-            <span className="font-semibold text-text">{(neutralRate * 100).toFixed(0)}%/년</span>
-          </div>
-          <div className="flex justify-between text-sub">
-            <span>필요 수익률</span>
-            <span className={`font-semibold ${rColor}`}>{pct100.toFixed(1)}%/년</span>
-          </div>
-        </div>
-      )}
+      <div className="mt-4 h-80">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 12, right: 18, bottom: 8, left: 0 }}>
+            <defs>
+              <linearGradient id="goalCone" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#38bdf8" stopOpacity={0.28} />
+                <stop offset="100%" stopColor="#38bdf8" stopOpacity={0.03} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
+            <XAxis dataKey="label" minTickGap={26} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={{ stroke: '#334155' }} tickLine={false} />
+            <YAxis tickFormatter={compactUsd} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={58} />
+            <Tooltip
+              formatter={(value, name) => {
+                if (Array.isArray(value)) return [`${compactUsd(value[0])} ~ ${compactUsd(value[1])}`, '예측 범위'];
+                const label = name === 'actual' ? '실제 자산' : '나의 추세';
+                return [compactUsd(Number(value)), label];
+              }}
+              contentStyle={{ background: '#020617', border: '1px solid #1e293b', borderRadius: 12, color: '#e2e8f0' }}
+              labelStyle={{ color: '#cbd5e1' }}
+            />
+            <ReferenceLine y={targetAmount} stroke="#a78bfa" strokeDasharray="6 4" label={{ value: '목표', fill: '#c4b5fd', fontSize: 11, position: 'insideTopRight' }} />
+            <Area type="monotone" dataKey="range" stroke="none" fill="url(#goalCone)" connectNulls />
+            <Line type="monotone" dataKey="actual" stroke="#e2e8f0" strokeWidth={3} dot={{ r: 3, fill: '#e2e8f0' }} connectNulls />
+            <Line type="monotone" dataKey="trend" stroke="#38bdf8" strokeWidth={3} strokeDasharray="7 6" dot={false} connectNulls />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-400">
+        <span><b className="text-slate-100">━</b> 실제 자산 기록</span>
+        <span><b className="text-sky-400">╌</b> 나의 실제 추세 연장선</span>
+        <span><b className="text-sky-300">■</b> 변동성 예측 범위</span>
+      </div>
     </div>
   );
 }
 
-function MonthlyCheckin({ history, neutralProj, krw, rate }: {
-  history: HistoryEntry[]; neutralProj: number[]; krw: boolean; rate: number;
-}) {
-  const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date));
-  if (sorted.length < 2) {
-    return (
-      <div className="rounded-xl border border-border bg-card p-4">
-        <h3 className="font-bold">월간 체크인</h3>
-        <div className="mt-3 rounded-lg bg-bg p-4 text-center text-sm text-sub">
-          자산 기록이 2개 이상이면 체크인 데이터가 표시됩니다.
+function PaceMeter({ analysis }: { analysis: GoalAnalysis }) {
+  const required = analysis.requiredMonthlyRate ?? 0;
+  const actual = analysis.actualMonthlyRate;
+  const maxRate = Math.max(Math.abs(required), Math.abs(actual), 0.01);
+  const actualPos = Math.max(4, Math.min(96, ((actual + maxRate) / (maxRate * 2)) * 100));
+  const requiredPos = Math.max(4, Math.min(96, ((required + maxRate) / (maxRate * 2)) * 100));
+  const meta = {
+    safe: {
+      title: '안전 운행 구간',
+      desc: '리스크를 낮추고 유지하세요',
+      tone: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200',
+      dot: 'bg-emerald-400',
+    },
+    steady: {
+      title: '정속 주행 구간',
+      desc: '현재 승률을 유지하세요',
+      tone: 'border-amber-400/30 bg-amber-400/10 text-amber-200',
+      dot: 'bg-amber-400',
+    },
+    fast: {
+      title: '과속 필요 구간',
+      desc: '추가 시드 또는 전략 수정 필요',
+      tone: 'border-rose-400/30 bg-rose-400/10 text-rose-200',
+      dot: 'bg-rose-400',
+    },
+  }[analysis.paceStatus];
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-bold text-slate-100">투자 온도계</h3>
+          <p className="mt-1 text-xs text-slate-400">최근 실제 월 수익률과 목표 달성에 필요한 월 수익률 비교</p>
         </div>
+        <span className={`rounded-full border px-3 py-1 text-xs font-bold ${meta.tone}`}>
+          <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${meta.dot}`} />
+          {meta.title}
+        </span>
+      </div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl bg-slate-900 p-3">
+          <div className="text-xs text-slate-400">최근 실제 월 수익률</div>
+          <div className="mt-1 text-2xl font-extrabold text-sky-300">{(actual * 100).toFixed(2)}%</div>
+        </div>
+        <div className="rounded-xl bg-slate-900 p-3">
+          <div className="text-xs text-slate-400">요구 월 수익률</div>
+          <div className="mt-1 text-2xl font-extrabold text-violet-300">{analysis.requiredMonthlyRate === null ? '-' : `${(required * 100).toFixed(2)}%`}</div>
+        </div>
+      </div>
+      <div className="relative mt-5 h-3 rounded-full bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-400">
+        <span className="absolute top-1/2 h-5 w-1 -translate-y-1/2 rounded bg-violet-100 shadow" style={{ left: `${requiredPos}%` }} title="요구 수익률" />
+        <span className="absolute top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-slate-950 bg-sky-300 shadow" style={{ left: `${actualPos}%` }} title="실제 수익률" />
+      </div>
+      <div className="mt-3 flex justify-between text-[11px] text-slate-500">
+        <span>부족</span><span>요구선</span><span>여유</span>
+      </div>
+      <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/80 p-3 text-sm font-semibold text-slate-200">
+        {meta.desc}
+      </div>
+    </div>
+  );
+}
+
+function ActionAdvice({ analysis, goalConfig, krw, rate }: { analysis: GoalAnalysis; goalConfig: GoalConfig; krw: boolean; rate: number }) {
+  if (analysis.paceStatus !== 'fast') {
+    return (
+      <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-emerald-100">
+        <h3 className="font-bold">행동 지침</h3>
+        <p className="mt-2 text-sm text-emerald-100/80">
+          현재 페이스는 목표 요구 속도와 같거나 더 빠릅니다. 신규 리스크를 과하게 늘리기보다 포지션 크기와 손절 기준을 유지하는 쪽이 유리합니다.
+        </p>
       </div>
     );
   }
-  const first = sorted[0], last = sorted[sorted.length - 1];
-  const prev = sorted.length >= 2 ? sorted[sorted.length - 2] : null;
-  const momChange = prev ? ((last.totalValue - prev.totalValue) / prev.totalValue) * 100 : 0;
-  const d0 = new Date(first.date + 'T00:00:00'), d1 = new Date(last.date + 'T00:00:00');
-  const yearsDiff = (d1.getTime() - d0.getTime()) / (365.25 * 86400000);
-  const cagr = yearsDiff > 0.05 && first.totalValue > 0
-    ? (Math.pow(last.totalValue / first.totalValue, 1 / yearsDiff) - 1) * 100 : null;
-  const monthsSince = (d1.getFullYear() - d0.getFullYear()) * 12 + (d1.getMonth() - d0.getMonth());
-  const expected = neutralProj[Math.max(0, monthsSince - 1)] ?? null;
-  const vsNeutral = expected && expected > 0 ? ((last.totalValue - expected) / expected) * 100 : null;
-
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <h3 className="font-bold">월간 체크인</h3>
-      <p className="mt-0.5 text-xs text-sub">마지막 기록 기준 · {last.date}</p>
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <div>
-          <div className="text-xs text-sub">총 자산</div>
-          <div className="mt-1 font-bold">{money(last.totalValue, krw, rate)}</div>
+    <div className="rounded-2xl border border-rose-400/25 bg-rose-400/10 p-4 text-rose-100">
+      <h3 className="font-bold">행동 지침 처방전</h3>
+      <div className="mt-3 grid gap-3">
+        <div className="rounded-xl border border-rose-300/20 bg-slate-950/60 p-3">
+          <div className="text-xs font-bold text-rose-200">처방 1 · 추가 시드</div>
+          <p className="mt-1 text-sm text-rose-50">
+            현재 승률을 유지할 경우, 매월 <b>{money(analysis.extraMonthlyDeposit, krw, rate)}</b>의 추가 입금이 필요합니다.
+          </p>
         </div>
-        <div>
-          <div className="text-xs text-sub">전 기록 대비</div>
-          <div className={`mt-1 font-bold ${colorClass(momChange)}`}>{momChange >= 0 ? '+' : ''}{momChange.toFixed(2)}%</div>
-        </div>
-        <div>
-          <div className="text-xs text-sub">연환산 수익률</div>
-          {cagr !== null
-            ? <div className={`mt-1 font-bold ${colorClass(cagr)}`}>{cagr >= 0 ? '+' : ''}{cagr.toFixed(1)}%</div>
-            : <div className="mt-1 text-sm text-sub">기간 부족</div>}
-        </div>
-        <div>
-          <div className="text-xs text-sub">중립 시나리오 대비</div>
-          {vsNeutral !== null
-            ? <div className={`mt-1 font-bold ${colorClass(vsNeutral)}`}>{vsNeutral >= 0 ? '+' : ''}{vsNeutral.toFixed(1)}%</div>
-            : <div className="mt-1 text-sm text-sub">—</div>}
+        <div className="rounded-xl border border-rose-300/20 bg-slate-950/60 p-3">
+          <div className="text-xs font-bold text-rose-200">처방 2 · 목표일 재조정</div>
+          <p className="mt-1 text-sm text-rose-50">
+            추가 입금 없이 현재 승률로 도달하려면, 목표 D-Day를 <b>{analysis.etaDate ? monthLabel(analysis.etaDate) : '산정 가능한 미래 시점'}</b>로 수정하는 것을 추천합니다.
+          </p>
         </div>
       </div>
-      <div className="mt-3 flex items-center gap-2 rounded-lg bg-bg px-3 py-2 text-xs text-sub">
-        <span>첫 기록</span><span className="font-semibold text-text">{first.date}</span>
-        <span className="text-border">|</span>
-        <span>{monthsSince}개월 경과</span>
-      </div>
+      <p className="mt-3 text-xs text-rose-100/70">현재 월 적립액 {money(goalConfig.monthlyContrib, krw, rate)}은 계산에 이미 반영했습니다.</p>
     </div>
   );
 }
@@ -829,14 +901,14 @@ export function GoalTracker({
 }) {
   if (!goalConfig) {
     return (
-      <div className="rounded-xl border border-border bg-card p-6">
+      <div className="rounded-2xl border border-slate-800 bg-slate-950 p-6 text-slate-100">
         <div className="text-center">
-          <div className="text-4xl">🎯</div>
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-sky-400/10 text-2xl text-sky-300">◎</div>
           <h2 className="mt-3 text-lg font-bold">투자 목표 트래커</h2>
-          <p className="mt-2 text-sm leading-6 text-sub">
-            목표 금액과 기한을 설정하면<br />달성률 · 예측 그래프 · 필요 수익률을 확인할 수 있습니다.
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            목표 금액과 기한을 설정하면<br />실제 기록 기반 ETA · 투자 온도계 · 행동 처방을 확인할 수 있습니다.
           </p>
-          <button onClick={onEdit} className="mt-5 rounded-xl bg-brand px-6 py-2.5 font-bold text-white">
+          <button onClick={onEdit} className="mt-5 rounded-xl bg-sky-500 px-6 py-2.5 font-bold text-white hover:bg-sky-400">
             목표 설정하기
           </button>
         </div>
@@ -856,87 +928,84 @@ function GoalTrackerContent({
   rate: number;
   onEdit: () => void;
 }) {
-  const [optimisticRate, neutralRate, conservativeRate] = getStyleRates(goalConfig.style, goalConfig.customRate);
-  const now = useMemo(() => new Date(), []);
-  const targetDate = new Date(goalConfig.targetDate + 'T00:00:00');
-  const dday = Math.ceil((targetDate.getTime() - now.getTime()) / 86400000);
-  const totalMonths = Math.max(1, Math.ceil((targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30.44)));
-  const achieveRate = goalConfig.targetAmount > 0 ? Math.min((currentAsset / goalConfig.targetAmount) * 100, 100) : 0;
-
-  const displayMonths = Math.min(totalMonths + 6, 66);
-  const optimisticProj = useMemo(() => projectScenario(currentAsset, goalConfig.monthlyContrib, optimisticRate, displayMonths), [currentAsset, goalConfig.monthlyContrib, optimisticRate, displayMonths]);
-  const neutralProj    = useMemo(() => projectScenario(currentAsset, goalConfig.monthlyContrib, neutralRate,    displayMonths), [currentAsset, goalConfig.monthlyContrib, neutralRate,    displayMonths]);
-  const conservativeProj = useMemo(() => projectScenario(currentAsset, goalConfig.monthlyContrib, conservativeRate, displayMonths), [currentAsset, goalConfig.monthlyContrib, conservativeRate, displayMonths]);
-
-  const optAm = optimisticProj.findIndex((v) => v >= goalConfig.targetAmount);
-  const neuAm = neutralProj.findIndex((v) => v >= goalConfig.targetAmount);
-  const conAm = conservativeProj.findIndex((v) => v >= goalConfig.targetAmount);
-
-  function monthToStr(idx: number) {
-    const d = new Date(now); d.setMonth(d.getMonth() + idx + 1);
-    return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
-  }
-
-  const requiredRate = useMemo(() => calcRequiredMonthlyRate(currentAsset, goalConfig.monthlyContrib, goalConfig.targetAmount, totalMonths), [currentAsset, goalConfig.monthlyContrib, goalConfig.targetAmount, totalMonths]);
-  const requiredAnnual = requiredRate !== null ? Math.pow(1 + requiredRate, 12) - 1 : null;
-
-  const ddayColor = dday < 0 ? 'text-rose-600' : dday < 90 ? 'text-amber-500' : 'text-text';
-  const achColor  = achieveRate >= 100 ? 'text-emerald-600' : achieveRate >= 50 ? 'text-brand' : 'text-text';
+  const analysis = useMemo(
+    () => buildGoalAnalysis(goalConfig, history, currentAsset),
+    [currentAsset, goalConfig, history]
+  );
+  const etaSummary = analysis.etaDate
+    ? `${monthLabel(analysis.etaDate)} (${analysis.delayMonths === null ? '목표 비교 불가' : formatSignedMonths(analysis.delayMonths)})`
+    : '현재 페이스로는 30년 내 도달이 어렵습니다';
+  const ddayText = analysis.dday > 0 ? `D-${analysis.dday.toLocaleString()}` : analysis.dday === 0 ? 'D-Day' : `D+${Math.abs(analysis.dday).toLocaleString()}`;
+  const statusCopy = {
+    safe: '목표보다 빠른 페이스입니다',
+    steady: '목표와 거의 같은 페이스입니다',
+    fast: '목표보다 느린 페이스입니다',
+  }[analysis.paceStatus];
 
   return (
     <div className="space-y-4">
-      {/* Header + 3 key metrics */}
-      <div className="rounded-xl border border-border bg-card p-4">
-        <div className="flex items-center justify-between gap-3">
+      <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 text-slate-100 shadow-sm">
+        <div className="border-b border-slate-800 bg-[radial-gradient(circle_at_top_right,_rgba(56,189,248,0.18),_transparent_34%),linear-gradient(135deg,_rgba(15,23,42,1),_rgba(2,6,23,1))] p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-sky-300">Goal Navigation</div>
+              <h2 className="mt-2 text-xl font-extrabold">투자 목표 트래커</h2>
+              <p className="mt-1 text-sm text-slate-400">{goalConfig.purpose} · 목표 {money(goalConfig.targetAmount, krw, rate)} · {goalConfig.targetDate}</p>
+            </div>
+            <button onClick={onEdit} className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-300 hover:border-sky-400 hover:text-sky-200">수정</button>
+          </div>
+          <div className="mt-5 grid gap-4 lg:grid-cols-[1.4fr_0.8fr_0.8fr]">
+            <div className="rounded-2xl border border-sky-300/20 bg-sky-300/10 p-4">
+              <div className="text-xs font-semibold text-sky-200">현재 페이스 유지 시 예상 도착일</div>
+              <div className="mt-2 text-2xl font-extrabold text-white">{analysis.etaDate ? monthLabel(analysis.etaDate) : '도달 어려움'}</div>
+              <div className="mt-1 text-sm font-semibold text-sky-100/80">{analysis.etaDate ? formatSignedMonths(analysis.delayMonths ?? 0) : statusCopy}</div>
+            </div>
+            <div className="rounded-2xl bg-slate-900 p-4">
+              <div className="text-xs text-slate-400">달성률</div>
+              <div className="mt-2 text-2xl font-extrabold text-white">{analysis.achieveRate.toFixed(1)}%</div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
+                <div className="h-full rounded-full bg-sky-400" style={{ width: `${analysis.achieveRate}%` }} />
+              </div>
+            </div>
+            <div className="rounded-2xl bg-slate-900 p-4">
+              <div className="text-xs text-slate-400">목표 D-Day</div>
+              <div className="mt-2 text-2xl font-extrabold text-white">{ddayText}</div>
+              <div className="mt-1 text-xs text-slate-500">{analysis.targetMonths}개월 남음</div>
+            </div>
+          </div>
+        </div>
+        <div className="grid gap-3 p-4 md:grid-cols-3">
           <div>
-            <h2 className="font-bold">🎯 투자 목표 트래커</h2>
-            <p className="mt-0.5 text-xs text-sub">{goalConfig.purpose} · 목표 {money(goalConfig.targetAmount, krw, rate)}</p>
+            <div className="text-xs text-slate-500">최근 실제 월평균 수익률</div>
+            <div className="mt-1 text-lg font-bold text-sky-300">{(analysis.actualMonthlyRate * 100).toFixed(2)}%</div>
+            <div className="text-[11px] text-slate-500">최근 {analysis.sampleMonths ? analysis.sampleMonths.toFixed(1) : '0'}개월 기록 기준</div>
           </div>
-          <button onClick={onEdit} className="rounded-md border border-border px-3 py-1.5 text-xs font-bold text-sub hover:text-brand">수정</button>
-        </div>
-        {/* Progress bar */}
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-bg">
-          <div className="h-full rounded-full bg-brand transition-all duration-500" style={{ width: `${achieveRate}%` }} />
-        </div>
-        {/* 3 key numbers */}
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          <div className="rounded-xl bg-bg p-3 text-center">
-            <div className="text-xs text-sub">달성률</div>
-            <div className={`mt-1 text-2xl font-extrabold ${achColor}`}>{achieveRate.toFixed(1)}%</div>
-            <div className="mt-0.5 text-[11px] text-sub">{money(currentAsset, krw, rate)}</div>
+          <div>
+            <div className="text-xs text-slate-500">요구 월 수익률</div>
+            <div className="mt-1 text-lg font-bold text-violet-300">{analysis.requiredMonthlyRate === null ? '-' : `${(analysis.requiredMonthlyRate * 100).toFixed(2)}%`}</div>
+            <div className="text-[11px] text-slate-500">목표 기한 내 달성 기준</div>
           </div>
-          <div className="rounded-xl bg-bg p-3 text-center">
-            <div className="text-xs text-sub">D-Day</div>
-            <div className={`mt-1 text-2xl font-extrabold tabular-nums ${ddayColor}`}>
-              {dday > 0 ? `D-${dday.toLocaleString()}` : dday === 0 ? 'D-Day' : `D+${Math.abs(dday)}`}
-            </div>
-            <div className="mt-0.5 text-[11px] text-sub">{goalConfig.targetDate}</div>
-          </div>
-          <div className="rounded-xl bg-bg p-3 text-center">
-            <div className="text-xs text-sub">예상 달성 (중립)</div>
-            <div className="mt-1 text-sm font-extrabold leading-snug text-brand">
-              {neuAm >= 0 ? monthToStr(neuAm) : '기간 초과'}
-            </div>
-            <div className="mt-0.5 text-[11px] text-sub">{goalConfig.style}</div>
+          <div>
+            <div className="text-xs text-slate-500">변동성</div>
+            <div className="mt-1 text-lg font-bold text-slate-200">{(analysis.volatility * 100).toFixed(2)}%</div>
+            <div className="text-[11px] text-slate-500">예측 범위 계산에 반영</div>
           </div>
         </div>
       </div>
 
-      {/* Scenario chart */}
-      <GoalScenarioChart
-        currentAsset={currentAsset} targetAmount={goalConfig.targetAmount} history={history}
-        optimisticProj={optimisticProj} neutralProj={neutralProj} conservativeProj={conservativeProj}
-        totalMonths={totalMonths} now={now} krw={krw} rate={rate}
-        optimisticAchieveMonth={optAm} neutralAchieveMonth={neuAm} conservativeAchieveMonth={conAm}
-      />
-
-      {/* Required return + monthly check-in */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <RequiredReturnCard
-          requiredAnnualRate={requiredAnnual} neutralRate={neutralRate}
-          totalMonths={totalMonths} goalConfig={goalConfig} krw={krw} rate={rate}
-        />
-        <MonthlyCheckin history={history} neutralProj={neutralProj} krw={krw} rate={rate} />
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <GoalForecastChart data={analysis.forecastData} targetAmount={goalConfig.targetAmount} />
+        <div className="space-y-4">
+          <PaceMeter analysis={analysis} />
+          <ActionAdvice analysis={analysis} goalConfig={goalConfig} krw={krw} rate={rate} />
+          <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-300">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500">ETA Summary</div>
+            <p className="mt-2 font-semibold text-slate-100">현재 페이스 유지 시 예상 도착일: {etaSummary}</p>
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              계산은 최근 1~3개월 기록을 우선 사용하고, 기록이 부족하면 최근 기록 구간으로 보정합니다. 예측 범위는 과거 월별 변동성을 기반으로 넓어집니다.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
