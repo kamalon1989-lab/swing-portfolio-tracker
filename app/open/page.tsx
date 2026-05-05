@@ -141,8 +141,8 @@ export default function OpenPage() {
         </div>
       )}
       <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
-          <a href="/" className="font-bold shrink-0">스윙 포트폴리오</a>
+        <div className="mx-auto flex max-w-7xl items-center gap-2 px-3 py-3 sm:gap-3 sm:px-4">
+          <a href="/" className="shrink-0 text-sm font-bold sm:text-base">스윙 포트폴리오</a>
           {signedIn && (
             <nav className="hidden gap-1 rounded-lg bg-bg p-1 sm:flex">
               {([
@@ -169,24 +169,24 @@ export default function OpenPage() {
               ]} />
             </div>
           )}
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-2">
             <span className="hidden text-xs text-sub lg:inline" title={status}>●</span>
             {signedIn && (
               <>
-                <MarketSessionBadge />
-                <button onClick={() => setKrw((v) => !v)} className={`rounded-md border px-3 py-1.5 text-sm font-semibold ${krw ? 'border-brand bg-brand/10 text-brand' : 'border-border text-sub'}`}>원화</button>
-                <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub">
+                <span className="hidden sm:inline-flex"><MarketSessionBadge /></span>
+                <button onClick={() => setKrw((v) => !v)} className={`rounded-md border px-2 py-1.5 text-xs font-semibold sm:px-3 sm:text-sm ${krw ? 'border-brand bg-brand/10 text-brand' : 'border-border text-sub'}`}>원화</button>
+                <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="rounded-md border border-border px-2 py-1.5 text-xs font-semibold text-sub sm:px-3 sm:text-sm">
                   {theme === 'dark' ? '라이트' : '다크'}
                 </button>
-                <button onClick={refreshPrices} className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60" disabled={loadingPrices}>
-                  {loadingPrices ? '조회 중' : '시세 갱신'}
+                <button onClick={refreshPrices} className="rounded-md bg-brand px-2 py-1.5 text-xs font-semibold text-white disabled:opacity-60 sm:px-3 sm:text-sm" disabled={loadingPrices}>
+                  {loadingPrices ? '조회' : <><span className="sm:hidden">갱신</span><span className="hidden sm:inline">시세 갱신</span></>}
                 </button>
               </>
             )}
             {user ? (
-              <button onClick={signOutCurrent} className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub">로그아웃</button>
+              <button onClick={signOutCurrent} className="rounded-md border border-border px-2 py-1.5 text-xs font-semibold text-sub sm:px-3 sm:text-sm">로그아웃</button>
             ) : !demo ? null : (
-              <a href="/open" className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-sub">로그인</a>
+              <a href="/open" className="rounded-md border border-border px-2 py-1.5 text-xs font-semibold text-sub sm:px-3 sm:text-sm">로그인</a>
             )}
           </div>
         </div>
@@ -205,7 +205,7 @@ export default function OpenPage() {
           </div>
         </section>
       ) : (
-        <div className="mx-auto max-w-7xl px-4 py-5">
+        <div className="mx-auto max-w-7xl px-4 pb-28 pt-5 sm:pb-5">
           <MobileTabs tab={tab} setTab={setTab} />
           {tab === 'portfolio' && (
             <PortfolioView

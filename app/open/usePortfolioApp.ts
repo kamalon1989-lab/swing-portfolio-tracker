@@ -106,6 +106,7 @@ export function usePortfolioApp() {
     const localHoldings = readJson<HoldingItem[]>(K.holdings, []);
     const localWatch = readJson<WatchItem[]>(K.watch, []);
     const localMemos = readJson<Record<string, string>>(K.memos, {});
+    const localGoal = readJson<GoalConfig | null>(K.goal, null);
     // holding.note / watch.note → tickerMemos 흡수 (tickerMemos에 값이 없는 경우만)
     const seedMemos = { ...localMemos };
     localHoldings.forEach((h) => { if (h.note && !seedMemos[h.ticker]) seedMemos[h.ticker] = h.note; });
@@ -119,7 +120,7 @@ export function usePortfolioApp() {
     setKrw(readJson<boolean>(K.krw, false));
     setTheme(readJson<'light' | 'dark'>(K.theme, 'light'));
     setTickerMemos(seedMemos);
-    setGoalConfig(readJson<GoalConfig | null>(K.goal, null));
+    setGoalConfig(localGoal);
     setReady(true);
 
     const unsub = onAuthStateChanged(getFirebaseAuth(), async (nextUser) => {
@@ -139,6 +140,8 @@ export function usePortfolioApp() {
           setJournal(data.j ?? []);
           setHistory(normalizeHistory(data.hi));
           setCash(data.c ?? 0);
+          const loadedGoal = data.g ?? localGoal ?? null;
+          setGoalConfig(loadedGoal);
           // holding.note / watch.note → tickerMemos 흡수 (tickerMemos에 값이 없는 경우만)
           const mergedMemos: Record<string, string> = { ...(data.m ?? {}) };
           loadedHoldings.forEach((h) => { if (h.note && !mergedMemos[h.ticker]) mergedMemos[h.ticker] = h.note; });
@@ -150,6 +153,7 @@ export function usePortfolioApp() {
           writeJson(K.history, data.hi ?? []);
           writeJson(K.cash, data.c ?? 0);
           writeJson(K.memos, mergedMemos);
+          writeJson(K.goal, loadedGoal);
           notify('Firebase 데이터를 불러왔습니다');
         }
       } catch {
@@ -218,13 +222,14 @@ export function usePortfolioApp() {
           hi: history,
           c: cash,
           m: tickerMemos,
+          g: goalConfig,
         });
         setStatus('Firebase 동기화 완료');
       } catch {
         setStatus('Firebase 동기화 실패');
       }
     }, 1200);
-  }, [user, demo, holdings, watch, journal, history, cash, tickerMemos]);
+  }, [user, demo, holdings, watch, journal, history, cash, tickerMemos, goalConfig]);
 
   const rows = useMemo(() => {
     let totalValue = 0;

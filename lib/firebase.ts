@@ -51,6 +51,14 @@ export interface LegacyPortfolio {
   hi?: HistoryEntry[];    // history (일별 기록)
   c?: number;             // cash
   m?: Record<string, string>; // ticker memos
+  g?: {
+    targetAmount: number;
+    targetDate: string;
+    purpose: string;
+    monthlyContrib: number;
+    style: '공격형' | '중립형' | '보수형' | '자유형';
+    customRate?: number;
+  } | null;                // investment goal
   k?: string | null;      // (Phase 3에서 제거 예정) finnhub api key
 }
 

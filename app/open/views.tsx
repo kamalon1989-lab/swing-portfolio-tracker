@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import {
   Area,
   AreaChart,
@@ -76,6 +77,7 @@ export function PortfolioView(props: {
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('value');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [mobileTicker, setMobileTicker] = useState('');
   const sortedRows = useMemo(() => {
     return [...props.rows].sort((a, b) => {
       const av = a[sortKey];
@@ -100,6 +102,7 @@ export function PortfolioView(props: {
     Array.from(holdingTickers).some((ticker) => earningsSymbolMatches(ticker, item.symbol))
   );
   const selectedRow = props.rows.find((row) => row.ticker === props.selectedTicker) ?? props.rows[0];
+  const mobileRow = props.rows.find((row) => row.ticker === mobileTicker);
   const maxRiskLoss = props.rows.reduce((sum, r) => {
     if (!r.price || !r.stopLoss || r.price <= r.stopLoss) return sum;
     return sum + (r.price - r.stopLoss) * r.shares;
@@ -112,6 +115,10 @@ export function PortfolioView(props: {
     ['총 자산', money(props.summary.totalAsset, props.krw, props.rate), '주식 + 예수금', 'text-brand'],
     ...(maxRiskLoss > 0 ? [['손절 시 최대손실', `-${money(maxRiskLoss, props.krw, props.rate)}`, `총 자산의 ${props.summary.totalAsset > 0 ? ((maxRiskLoss / props.summary.totalAsset) * 100).toFixed(1) : 0}%`, 'text-rose-600']] : []),
   ];
+  const openMobileTicker = (ticker: string) => {
+    props.onSelectTicker(ticker);
+    setMobileTicker(ticker);
+  };
   return (
     <section className="space-y-4">
       <div className={`grid gap-3 ${cards.length === 6 ? 'sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6' : 'md:grid-cols-5'}`}>
@@ -124,7 +131,49 @@ export function PortfolioView(props: {
         ))}
       </div>
       <PriceAlerts alerts={alerts} />
-      <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+      <div className="space-y-3 sm:hidden">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold">보유 종목</h2>
+          <button onClick={props.onRecord} className="rounded-lg border border-border px-3 py-1.5 text-xs font-bold">오늘 기록</button>
+        </div>
+        {sortedRows.map((r) => (
+          <button key={r.ticker} type="button" onClick={() => openMobileTicker(r.ticker)} className="w-full rounded-2xl border border-border bg-card p-4 text-left shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <strong className="text-lg text-brand">{r.ticker}</strong>
+                  <HoldingDaysBadge buyDate={r.buyDate || r.lastBuyDate} />
+                </div>
+                {r.name && <div className="mt-0.5 truncate text-xs text-sub">{r.name}</div>}
+              </div>
+              <div className="text-right">
+                <div className="font-bold">{r.price ? usd(r.price) : '-'}</div>
+                <div className={`text-xs font-semibold ${colorClass(r.dayPct)}`}>{r.price ? pct(r.dayPct) : '-'}</div>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+              <div className="rounded-xl bg-bg p-2">
+                <div className="text-sub">평가</div>
+                <div className="mt-1 font-bold">{r.price ? money(r.value, props.krw, props.rate) : '-'}</div>
+              </div>
+              <div className="rounded-xl bg-bg p-2">
+                <div className="text-sub">손익</div>
+                <div className={`mt-1 font-bold ${colorClass(r.pnl)}`}>{r.price ? money(r.pnl, props.krw, props.rate) : '-'}</div>
+              </div>
+              <div className="rounded-xl bg-bg p-2">
+                <div className="text-sub">수익률</div>
+                <div className={`mt-1 font-bold ${colorClass(r.pnlPct)}`}>{r.price ? pct(r.pnlPct) : '-'}</div>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-2 text-xs text-sub">
+              <span>수량 {r.shares} · 비중 {r.weight.toFixed(1)}%</span>
+              <span>{r.targetPrice ? `목표 ${usd(r.targetPrice)}` : '목표 없음'}</span>
+            </div>
+          </button>
+        ))}
+        {!props.rows.length && <div className="rounded-xl bg-card p-10 text-center text-sm text-sub">보유 종목이 없습니다.</div>}
+      </div>
+      <div className="hidden overflow-x-auto rounded-xl border border-border bg-card shadow-sm sm:block">
         <div className="no-print flex items-center justify-between border-b border-border px-4 py-2.5">
           <span className="text-sm font-bold">보유 종목</span>
           <button onClick={props.onRecord} className="rounded-lg border border-border px-3 py-1.5 text-xs font-bold">오늘 기록</button>
@@ -177,13 +226,23 @@ export function PortfolioView(props: {
         </table>
         {!props.rows.length && <div className="p-12 text-center text-sm text-sub">보유 종목이 없습니다.</div>}
       </div>
-      <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+      <div className="hidden gap-4 sm:grid lg:grid-cols-[1fr_360px]">
         <div className="space-y-4">
           <PositionPathChart row={selectedRow} />
           <TickerDetail ticker={props.selectedTicker} theme={props.theme} earnings={holdingEarnings} memo={props.tickerMemos[props.selectedTicker] ?? props.rows.find((r) => r.ticker === props.selectedTicker)?.note ?? ''} onSaveMemo={props.selectedTicker ? (text) => props.onSaveMemo(props.selectedTicker, text) : undefined} />
         </div>
         <EarningsPanel earnings={holdingEarnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
       </div>
+      <MobileTickerSheet
+        open={Boolean(mobileTicker)}
+        onClose={() => setMobileTicker('')}
+        ticker={mobileTicker}
+        theme={props.theme}
+        earnings={holdingEarnings}
+        memo={mobileTicker ? props.tickerMemos[mobileTicker] ?? mobileRow?.note ?? '' : ''}
+        onSaveMemo={mobileTicker ? (text) => props.onSaveMemo(mobileTicker, text) : undefined}
+        extra={mobileRow ? <PositionPathChart row={mobileRow} /> : null}
+      />
     </section>
   );
 }
@@ -232,6 +291,50 @@ function PositionPathChart({ row }: { row?: HoldingRow }) {
           </AreaChart>
         </ResponsiveContainer>
       </div>
+    </div>
+  );
+}
+
+function MobileTickerSheet({
+  open,
+  onClose,
+  ticker,
+  theme,
+  earnings,
+  memo,
+  onSaveMemo,
+  extra,
+}: {
+  open: boolean;
+  onClose: () => void;
+  ticker: string;
+  theme: 'light' | 'dark';
+  earnings: EarningsItem[];
+  memo: string;
+  onSaveMemo?: (text: string) => void;
+  extra?: ReactNode;
+}) {
+  if (!open || !ticker) return null;
+  return (
+    <div className="fixed inset-0 z-50 sm:hidden">
+      <button type="button" aria-label="상세 닫기" onClick={onClose} className="absolute inset-0 bg-slate-950/55" />
+      <section
+        className="absolute inset-x-0 bottom-0 max-h-[88vh] overflow-y-auto rounded-t-[28px] border border-slate-800 bg-slate-950 p-3 pb-6 shadow-2xl"
+        style={{ animation: 'mobileSheetUp 220ms ease-out' }}
+      >
+        <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-700" />
+        <div className="mb-3 flex items-center justify-between px-1">
+          <div>
+            <h2 className="text-lg font-extrabold text-slate-100">{ticker}</h2>
+            <p className="text-xs text-slate-400">상세 차트와 메모</p>
+          </div>
+          <button onClick={onClose} className="rounded-full border border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-300">닫기</button>
+        </div>
+        <div className="space-y-3">
+          {extra}
+          <TickerDetail ticker={ticker} theme={theme} earnings={earnings} memo={memo} onSaveMemo={onSaveMemo} />
+        </div>
+      </section>
     </div>
   );
 }
@@ -352,9 +455,14 @@ export function WatchView({
   tickerMemos: Record<string, string>;
   onSaveMemo: (ticker: string, text: string) => void;
 }) {
+  const [mobileTicker, setMobileTicker] = useState('');
   const watchTickers = new Set(watch.map((item) => item.ticker));
   const watchEarnings = earnings.filter((item) => Array.from(watchTickers).some((ticker) => earningsSymbolMatches(ticker, item.symbol)));
   const alerts = makeWatchPriceAlerts(watch, prices);
+  const openMobileTicker = (ticker: string) => {
+    onSelectTicker(ticker);
+    setMobileTicker(ticker);
+  };
   return (
     <section className="space-y-4">
       <div className="no-print flex flex-wrap gap-2">
@@ -363,7 +471,45 @@ export function WatchView({
       </div>
       <PriceAlerts alerts={alerts} />
       <WatchDistanceChart watch={watch} prices={prices} />
-      <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      <div className="space-y-3 sm:hidden">
+        {watch.map((w) => {
+          const price = prices[w.ticker]?.price;
+          const dist = (price && w.targetBuy) ? ((price - w.targetBuy) / price) * 100 : null;
+          return (
+            <button key={w.ticker} type="button" onClick={() => openMobileTicker(w.ticker)} className="w-full rounded-2xl border border-border bg-card p-4 text-left shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <strong className="text-lg text-brand">{w.ticker}</strong>
+                  {w.name && <div className="mt-0.5 truncate text-xs text-sub">{w.name}</div>}
+                </div>
+                <div className="text-right">
+                  <div className="font-bold">{price ? usd(price) : '-'}</div>
+                  <div className={`text-xs font-semibold ${colorClass(prices[w.ticker]?.changePercent ?? 0)}`}>{prices[w.ticker] ? pct(prices[w.ticker].changePercent ?? 0) : '-'}</div>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-xl bg-bg p-2">
+                  <div className="text-sub">목표 진입가</div>
+                  <div className="mt-1 font-bold">{w.targetBuy ? usd(w.targetBuy) : '-'}</div>
+                </div>
+                <div className="rounded-xl bg-bg p-2">
+                  <div className="text-sub">거리</div>
+                  <div className={`mt-1 font-bold ${dist === null ? '' : dist <= 0 ? 'text-emerald-600' : dist <= 5 ? 'text-amber-500' : 'text-sub'}`}>
+                    {dist === null ? '-' : dist <= 0 ? '도달' : `+${dist.toFixed(1)}%`}
+                  </div>
+                </div>
+              </div>
+              {w.note && <div className="mt-3 line-clamp-2 text-xs text-sub">{w.note}</div>}
+              <div className="mt-3 flex justify-end gap-2">
+                <span onClick={(e) => { e.stopPropagation(); onEdit(w); }} className="rounded-md border border-border px-2 py-1 text-xs font-bold text-brand">수정</span>
+                <span onClick={(e) => { e.stopPropagation(); onDelete(w.ticker); }} className="rounded-md border border-rose-200 px-2 py-1 text-xs font-bold text-rose-600">삭제</span>
+              </div>
+            </button>
+          );
+        })}
+        {!watch.length && <div className="rounded-xl bg-card p-10 text-center text-sm text-sub">관심 종목이 없습니다.</div>}
+      </div>
+      <div className="hidden overflow-x-auto rounded-xl border border-border bg-card sm:block">
         <table className="w-full min-w-[680px] text-sm">
           <thead className="bg-bg text-xs text-sub"><tr><th className="px-3 py-3 text-left">티커</th><th className="px-3 py-3 text-right">현재가</th><th className="px-3 py-3 text-right">목표 진입가</th><th className="px-3 py-3 text-right">거리</th><th className="px-3 py-3 text-right">오늘</th><th className="px-3 py-3 text-left">메모</th><th className="px-3 py-3 text-right">관리</th></tr></thead>
           <tbody>{watch.map((w) => {
@@ -386,10 +532,19 @@ export function WatchView({
         </table>
         {!watch.length && <div className="p-12 text-center text-sm text-sub">관심 종목이 없습니다.</div>}
       </div>
-      <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+      <div className="hidden gap-4 sm:grid lg:grid-cols-[1fr_360px]">
         <TickerDetail ticker={selectedTicker} theme={theme} earnings={watchEarnings} memo={tickerMemos[selectedTicker] ?? ''} onSaveMemo={selectedTicker ? (text) => onSaveMemo(selectedTicker, text) : undefined} />
         <EarningsPanel earnings={watchEarnings} loading={loadingEarnings} onRefresh={onRefreshEarnings} />
       </div>
+      <MobileTickerSheet
+        open={Boolean(mobileTicker)}
+        onClose={() => setMobileTicker('')}
+        ticker={mobileTicker}
+        theme={theme}
+        earnings={watchEarnings}
+        memo={mobileTicker ? tickerMemos[mobileTicker] ?? '' : ''}
+        onSaveMemo={mobileTicker ? (text) => onSaveMemo(mobileTicker, text) : undefined}
+      />
     </section>
   );
 }
@@ -522,7 +677,43 @@ export function JournalView({ journal, onAdd, onEdit, onDelete }: { journal: Jou
       <JournalSummary journal={journal} />
       <JournalFlowChart journal={journal} />
       <MonthlyPnlCalendar journal={journal} />
-      <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      <div className="space-y-3 sm:hidden">
+        {sorted.map((j) => (
+          <div key={j.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs text-sub">{j.date}</div>
+                <div className="mt-1 flex items-center gap-2">
+                  <strong>{j.ticker}</strong>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${j.action === 'buy' ? 'bg-blue-50 text-blue-700' : 'bg-rose-50 text-rose-700'}`}>{j.action === 'buy' ? '매수' : '매도'}</span>
+                </div>
+              </div>
+              <div className={`text-right font-bold ${j.action === 'buy' ? 'text-blue-600' : 'text-rose-600'}`}>{usd(j.shares * j.price)}</div>
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+              <div className="rounded-xl bg-bg p-2">
+                <div className="text-sub">수량</div>
+                <div className="mt-1 font-bold">{j.shares}</div>
+              </div>
+              <div className="rounded-xl bg-bg p-2">
+                <div className="text-sub">단가</div>
+                <div className="mt-1 font-bold">{usd(j.price)}</div>
+              </div>
+              <div className="rounded-xl bg-bg p-2">
+                <div className="text-sub">전략</div>
+                <div className="mt-1 truncate font-bold">{j.strategy || '-'}</div>
+              </div>
+            </div>
+            {j.note && <div className="mt-3 line-clamp-2 text-xs text-sub">{j.note}</div>}
+            <div className="mt-3 flex justify-end gap-2">
+              <button onClick={() => onEdit(j)} className="rounded-md border border-border px-2 py-1 text-xs font-bold text-brand">수정</button>
+              <button onClick={() => onDelete(j.id)} className="rounded-md border border-rose-200 px-2 py-1 text-xs font-bold text-rose-600">삭제</button>
+            </div>
+          </div>
+        ))}
+        {!journal.length && <div className="rounded-xl bg-card p-10 text-center text-sm text-sub">거래 기록이 없습니다.</div>}
+      </div>
+      <div className="hidden overflow-x-auto rounded-xl border border-border bg-card sm:block">
         <table className="w-full min-w-[900px] text-sm">
           <thead className="bg-bg text-xs text-sub"><tr><th className="px-3 py-3 text-left">날짜</th><th className="px-3 py-3">구분</th><th className="px-3 py-3 text-left">티커</th><th className="px-3 py-3 text-right">수량</th><th className="px-3 py-3 text-right">단가</th><th className="px-3 py-3 text-right">금액</th><th className="px-3 py-3 text-left">전략</th><th className="px-3 py-3 text-left">메모</th><th className="px-3 py-3 text-right">관리</th></tr></thead>
           <tbody>{sorted.map((j) => <tr key={j.id} className="border-t border-border"><td className="px-3 py-3">{j.date}</td><td className="px-3 py-3 text-center"><span className={`rounded-full px-2 py-1 text-xs font-bold ${j.action === 'buy' ? 'bg-blue-50 text-blue-700' : 'bg-rose-50 text-rose-700'}`}>{j.action === 'buy' ? '매수' : '매도'}</span></td><td className="px-3 py-3 font-bold">{j.ticker}</td><td className="px-3 py-3 text-right">{j.shares}</td><td className="px-3 py-3 text-right">{usd(j.price)}</td><td className={`px-3 py-3 text-right font-semibold ${j.action === 'buy' ? 'text-blue-600' : 'text-rose-600'}`}>{usd(j.shares * j.price)}</td><td className="px-3 py-3">{j.strategy ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{j.strategy}</span> : <span className="text-sub">-</span>}</td><td className="px-3 py-3 text-sub">{j.note || '-'}</td><td className="px-3 py-3 text-right"><button onClick={() => onEdit(j)} className="no-print mr-2 text-brand">수정</button><button onClick={() => onDelete(j.id)} className="no-print text-rose-600">삭제</button></td></tr>)}</tbody>

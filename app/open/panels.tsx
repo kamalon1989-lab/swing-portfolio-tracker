@@ -148,14 +148,14 @@ const chartColors = ['#2563eb', '#16a34a', '#dc2626', '#7c3aed', '#f59e0b', '#08
 
 export function MobileTabs({ tab, setTab }: { tab: Tab; setTab: (tab: Tab) => void }) {
   return (
-    <nav className="mb-4 grid grid-cols-4 gap-1 rounded-lg bg-card p-1 shadow-sm sm:hidden">
+    <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-4 gap-1 rounded-2xl border border-border bg-card/95 p-1.5 shadow-2xl backdrop-blur sm:hidden mobile-bottom-nav">
       {([
         ['portfolio', '포트폴리오'],
         ['assets', '자산'],
         ['watchlist', '관심'],
         ['journal', '일지'],
       ] as const).map(([key, label]) => (
-        <button key={key} onClick={() => setTab(key)} className={`rounded-md px-2 py-2 text-xs font-bold ${tab === key ? 'bg-brand text-white' : 'text-sub'}`}>
+        <button key={key} onClick={() => setTab(key)} className={`rounded-xl px-2 py-2.5 text-xs font-bold ${tab === key ? 'bg-brand text-white shadow-sm' : 'text-sub'}`}>
           {label}
         </button>
       ))}
@@ -278,7 +278,47 @@ export function AssetsView({
             {sortedHistory.length}건
           </div>
         </div>
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-800">
+        <div className="mt-4 space-y-3 sm:hidden">
+          {sortedHistory.map((h, index) => {
+            const prev = sortedHistory[index - 1];
+            const change = prev?.totalValue ? ((h.totalValue - prev.totalValue) / prev.totalValue) * 100 : 0;
+            return (
+              <div key={h.date} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs text-slate-500">기록일</div>
+                    <div className="mt-1 font-bold text-slate-100">{h.date}</div>
+                  </div>
+                  {prev ? (
+                    <span className={`rounded-full px-2 py-1 text-xs font-bold ${change >= 0 ? 'bg-emerald-400/10 text-emerald-300' : 'bg-rose-400/10 text-rose-300'}`}>
+                      {pct(change)}
+                    </span>
+                  ) : <span className="text-xs text-slate-500">첫 기록</span>}
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+                  <div className="rounded-xl bg-slate-950 p-2">
+                    <div className="text-slate-500">총 자산</div>
+                    <div className="mt-1 font-bold text-slate-100">{money(h.totalValue, krw, rate)}</div>
+                  </div>
+                  <div className="rounded-xl bg-slate-950 p-2">
+                    <div className="text-slate-500">주식</div>
+                    <div className="mt-1 font-bold text-slate-200">{money(h.stockValue, krw, rate)}</div>
+                  </div>
+                  <div className="rounded-xl bg-slate-950 p-2">
+                    <div className="text-slate-500">예수금</div>
+                    <div className="mt-1 font-bold text-slate-200">{money(h.cashValue, krw, rate)}</div>
+                  </div>
+                </div>
+                <div className="mt-3 flex justify-end gap-2">
+                  <button onClick={() => onEditHistory(h)} className="rounded-md border border-slate-700 px-2 py-1 text-xs font-bold text-sky-300">수정</button>
+                  <button onClick={() => onDeleteHistory(h.date)} className="rounded-md border border-rose-400/30 px-2 py-1 text-xs font-bold text-rose-300">삭제</button>
+                </div>
+              </div>
+            );
+          })}
+          {!sortedHistory.length && <div className="p-10 text-center text-sm text-slate-400">포트폴리오 탭에서 오늘 기록을 저장하면 여기에 쌓입니다.</div>}
+        </div>
+        <div className="mt-4 hidden overflow-x-auto rounded-xl border border-slate-800 sm:block">
           <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-slate-900 text-xs text-slate-400"><tr><th className="px-3 py-3 text-left">날짜</th><th className="px-3 py-3 text-right">총 자산</th><th className="px-3 py-3 text-right">주식</th><th className="px-3 py-3 text-right">예수금</th><th className="px-3 py-3 text-right">변화율</th><th className="px-3 py-3 text-right">관리</th></tr></thead>
             <tbody>{sortedHistory.map((h, index) => {
