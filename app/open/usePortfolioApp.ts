@@ -28,6 +28,7 @@ import {
   uid,
   writeJson,
   type EarningsItem,
+  type GoalConfig,
   type HistoryEntry,
   type PriceMap,
   type SharePayload,
@@ -69,6 +70,8 @@ export function usePortfolioApp() {
   const [pdfPayload, setPdfPayload] = useState<SharePayload | null>(null);
   const [tickerMemos, setTickerMemos] = useState<Record<string, string>>({});
   const [benchData, setBenchData] = useState<{ date: string; price: number }[]>([]);
+  const [goalConfig, setGoalConfig] = useState<GoalConfig | null>(null);
+  const [showGoalForm, setShowGoalForm] = useState(false);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cloudLoaded = useRef(false);
 
@@ -116,6 +119,7 @@ export function usePortfolioApp() {
     setKrw(readJson<boolean>(K.krw, false));
     setTheme(readJson<'light' | 'dark'>(K.theme, 'light'));
     setTickerMemos(seedMemos);
+    setGoalConfig(readJson<GoalConfig | null>(K.goal, null));
     setReady(true);
 
     const unsub = onAuthStateChanged(getFirebaseAuth(), async (nextUser) => {
@@ -192,7 +196,8 @@ export function usePortfolioApp() {
     writeJson(K.prices, prices);
     writeJson(K.krw, krw);
     writeJson(K.memos, tickerMemos);
-  }, [ready, demo, holdings, watch, journal, history, cash, prices, krw, tickerMemos]);
+    writeJson(K.goal, goalConfig);
+  }, [ready, demo, holdings, watch, journal, history, cash, prices, krw, tickerMemos, goalConfig]);
 
   useEffect(() => {
     if (!pdfPayload) return;
@@ -525,6 +530,13 @@ export function usePortfolioApp() {
     setWatch((prev) => prev.map((w) => w.ticker === ticker ? { ...w, note: text } : w));
   }
 
+  function saveGoal(config: GoalConfig) {
+    setGoalConfig(config);
+    writeJson(K.goal, config);
+    setShowGoalForm(false);
+    notify('투자 목표를 저장했습니다');
+  }
+
   async function refreshBenchmark() {
     const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date));
     if (sorted.length < 2) return;
@@ -600,6 +612,10 @@ export function usePortfolioApp() {
     benchData,
     saveTickerMemo,
     refreshBenchmark,
+    goalConfig,
+    showGoalForm,
+    setShowGoalForm,
+    saveGoal,
     pdfPayload,
     setPdfPayload,
     rows,

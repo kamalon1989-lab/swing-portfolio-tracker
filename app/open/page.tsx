@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CashForm, HistoryForm, HoldingForm, PositionSizingForm, RecordDateForm, TradeForm, WatchForm } from './forms';
+import { CashForm, GoalForm, HistoryForm, HoldingForm, PositionSizingForm, RecordDateForm, TradeForm, WatchForm } from './forms';
 import { AssetsView, MobileTabs, PortfolioPdfReport, ShareView } from './panels';
 import { JournalView, PortfolioView, WatchView } from './views';
 import { usePortfolioApp } from './usePortfolioApp';
@@ -119,6 +119,10 @@ export default function OpenPage() {
     exportPdfReport,
     signInWithGoogle,
     signOutCurrent,
+    goalConfig,
+    showGoalForm,
+    setShowGoalForm,
+    saveGoal,
   } = app;
 
   if (!ready) return <main className="min-h-screen grid place-items-center text-slate-500">불러오는 중...</main>;
@@ -235,6 +239,8 @@ export default function OpenPage() {
               onEditHistory={(entry) => { setEditingHistory(entry); setShowHistoryForm(true); }}
               onDeleteHistory={deleteHistory}
               benchData={benchData}
+              goalConfig={goalConfig}
+              onEditGoal={() => setShowGoalForm(true)}
             />
           )}
           {tab === 'watchlist' && (
@@ -284,6 +290,7 @@ export default function OpenPage() {
       {showCashForm && <CashForm cash={cash} onClose={() => setShowCashForm(false)} onSave={saveCash} />}
       {showRecordForm && <RecordDateForm onClose={() => setShowRecordForm(false)} onSave={recordToday} />}
       {showHistoryForm && editingHistory && <HistoryForm entry={editingHistory} onClose={() => { setShowHistoryForm(false); setEditingHistory(null); }} onSave={saveHistory} />}
+      {showGoalForm && <GoalForm initial={goalConfig} currentAsset={summary.totalAsset} krw={krw} rate={rate} onClose={() => setShowGoalForm(false)} onSave={saveGoal} />}
     </main>
     {pdfPayload && <PortfolioPdfReport payload={pdfPayload} />}
     </>

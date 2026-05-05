@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import type { HoldingItem, JournalItem, WatchItem } from '@/lib/firebase';
-import { today, type HistoryEntry } from './model';
+import { today, type GoalConfig, type HistoryEntry, type InvestStyle } from './model';
 
 export function HoldingForm({
   item,
@@ -199,6 +199,149 @@ export function CashForm({
         <Field label="예수금" required><input className={inputClass()} type="number" step="0.01" value={value} onChange={(e) => setValue(e.target.value)} /></Field>
         <button className="rounded-lg bg-brand px-4 py-2 font-bold text-white">저장</button>
       </form>
+    </Modal>
+  );
+}
+
+export function GoalForm({
+  initial,
+  currentAsset,
+  krw,
+  rate,
+  onClose,
+  onSave,
+}: {
+  initial: GoalConfig | null;
+  currentAsset: number;
+  krw: boolean;
+  rate: number;
+  onClose: () => void;
+  onSave: (config: GoalConfig) => void;
+}) {
+  const [step, setStep] = useState(0);
+  const [targetAmountStr, setTargetAmountStr] = useState(String(initial?.targetAmount || ''));
+  const [targetDate, setTargetDate] = useState(initial?.targetDate || '');
+  const [purpose, setPurpose] = useState(initial?.purpose || '종잣돈');
+  const [customPurpose, setCustomPurpose] = useState('');
+  const [monthlyContribStr, setMonthlyContribStr] = useState(String(initial?.monthlyContrib || ''));
+  const [style, setStyle] = useState<InvestStyle>(initial?.style || '중립형');
+  const [customRateStr, setCustomRateStr] = useState(String(initial?.customRate || '10'));
+
+  const purposes = ['집 구매', '유학', '은퇴', '종잣돈', '기타'];
+  const styles: InvestStyle[] = ['공격형', '중립형', '보수형', '자유형'];
+  const styleInfo: Record<InvestStyle, { rate: string; desc: string }> = {
+    '공격형': { rate: '연 18% 기준', desc: '높은 수익을 추구하며 변동성을 감수합니다.' },
+    '중립형': { rate: '연 12% 기준', desc: '수익과 안정을 균형있게 추구합니다.' },
+    '보수형': { rate: '연 7% 기준', desc: '안정성을 우선시하며 보수적으로 운용합니다.' },
+    '자유형': { rate: '직접 설정', desc: '연수익률을 직접 입력해 예측합니다.' },
+  };
+
+  function handleSave() {
+    const targetAmount = parseFloat(targetAmountStr) || 0;
+    if (!targetAmount || !targetDate) return;
+    onSave({
+      targetAmount,
+      targetDate,
+      purpose: purpose === '기타' ? (customPurpose || '기타') : purpose,
+      monthlyContrib: parseFloat(monthlyContribStr) || 0,
+      style,
+      customRate: style === '자유형' ? (parseFloat(customRateStr) || 10) : undefined,
+    });
+  }
+
+  return (
+    <Modal title={`투자 목표 설정 (${step + 1}/3)`} onClose={onClose}>
+      {/* Progress bar */}
+      <div className="mb-5 flex gap-1.5">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? 'bg-brand' : 'bg-border'}`} />
+        ))}
+      </div>
+
+      {step === 0 && (
+        <div className="grid gap-3">
+          <p className="text-xs font-semibold text-sub">① 나의 목표</p>
+          <Field label="목표 금액 ($)" required>
+            <input className={inputClass()} type="number" step="1000" placeholder="예: 100000"
+              value={targetAmountStr} onChange={(e) => setTargetAmountStr(e.target.value)} autoFocus />
+          </Field>
+          <Field label="목표 달성 기한" required>
+            <input className={inputClass()} type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
+          </Field>
+          <Field label="목표 용도" required>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {purposes.map((p) => (
+                <button key={p} type="button" onClick={() => setPurpose(p)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${purpose === p ? 'border-brand bg-brand/10 text-brand' : 'border-border text-sub hover:border-brand/40'}`}>
+                  {p}
+                </button>
+              ))}
+            </div>
+            {purpose === '기타' && (
+              <input className={`${inputClass()} mt-2`} placeholder="목표 용도를 입력하세요"
+                value={customPurpose} onChange={(e) => setCustomPurpose(e.target.value)} />
+            )}
+          </Field>
+          <button type="button" disabled={!targetAmountStr || !targetDate}
+            onClick={() => setStep(1)}
+            className="mt-1 rounded-lg bg-brand px-4 py-2 font-bold text-white disabled:opacity-40">
+            다음 단계 →
+          </button>
+        </div>
+      )}
+
+      {step === 1 && (
+        <div className="grid gap-3">
+          <p className="text-xs font-semibold text-sub">② 현재 상황</p>
+          <div className="rounded-xl border border-border bg-bg p-3">
+            <div className="text-xs text-sub">현재 투자 자산 (자동 연동)</div>
+            <div className="mt-1 text-xl font-extrabold text-brand">
+              ${currentAsset.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+            </div>
+            {krw && rate > 0 && (
+              <div className="text-xs text-sub">≈ ₩{Math.round(currentAsset * rate).toLocaleString('ko-KR')}</div>
+            )}
+          </div>
+          <Field label="월 적립액 ($)" optional>
+            <input className={inputClass()} type="number" step="100" placeholder="예: 500 (없으면 0)"
+              value={monthlyContribStr} onChange={(e) => setMonthlyContribStr(e.target.value)} />
+          </Field>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setStep(0)}
+              className="flex-1 rounded-lg border border-border py-2 text-sm font-bold text-sub">← 이전</button>
+            <button type="button" onClick={() => setStep(2)}
+              className="flex-1 rounded-lg bg-brand py-2 text-sm font-bold text-white">다음 단계 →</button>
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="grid gap-3">
+          <p className="text-xs font-semibold text-sub">③ 투자 스타일</p>
+          <div className="grid grid-cols-2 gap-2">
+            {styles.map((s) => (
+              <button key={s} type="button" onClick={() => setStyle(s)}
+                className={`rounded-xl border p-3 text-left transition-all ${style === s ? 'border-brand bg-brand/10' : 'border-border hover:border-brand/40'}`}>
+                <div className={`text-sm font-bold ${style === s ? 'text-brand' : 'text-text'}`}>{s}</div>
+                <div className="mt-0.5 text-[11px] text-sub">{styleInfo[s].rate}</div>
+              </button>
+            ))}
+          </div>
+          {style === '자유형' && (
+            <Field label="중립 연수익률 (%)" required>
+              <input className={inputClass()} type="number" step="1" min="1" max="200"
+                value={customRateStr} onChange={(e) => setCustomRateStr(e.target.value)} />
+            </Field>
+          )}
+          <p className="rounded-lg bg-bg px-3 py-2 text-xs text-sub">{styleInfo[style].desc}</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setStep(1)}
+              className="flex-1 rounded-lg border border-border py-2 text-sm font-bold text-sub">← 이전</button>
+            <button type="button" onClick={handleSave}
+              className="flex-1 rounded-lg bg-brand py-2 text-sm font-bold text-white">목표 저장 ✓</button>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }

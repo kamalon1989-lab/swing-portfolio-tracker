@@ -32,6 +32,17 @@ export type SharePayload = {
   rows: Array<{ t: string; n?: string; pnl: number; w: number }>;
 };
 
+export type InvestStyle = '공격형' | '중립형' | '보수형' | '자유형';
+
+export type GoalConfig = {
+  targetAmount: number;      // 목표 금액 (USD)
+  targetDate: string;        // YYYY-MM-DD
+  purpose: string;           // 집 구매 | 유학 | 은퇴 | 종잣돈 | 기타
+  monthlyContrib: number;    // 월 적립액 (USD)
+  style: InvestStyle;
+  customRate?: number;       // 자유형 전용: 중립 연수익률 (%)
+};
+
 export const K = {
   holdings: 'ptf_h2',
   history: 'ptf_hist',
@@ -42,6 +53,7 @@ export const K = {
   krw: 'ptf_krw',
   theme: 'ptf_theme',
   memos: 'ptf_memos',
+  goal: 'ptf_goal',
 };
 
 export const demoHoldings: HoldingItem[] = [
