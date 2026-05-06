@@ -25,7 +25,9 @@ import {
   pct,
   usd,
   type EarningsItem,
+  type Price,
   type PriceMap,
+  type PriceSession,
 } from './model';
 
 type HoldingRow = HoldingItem & {
@@ -36,6 +38,10 @@ type HoldingRow = HoldingItem & {
   pnlPct: number;
   dayPct: number;
   weight: number;
+  priceSession?: PriceSession;
+  priceSource?: Price['source'];
+  regularPrice?: number;
+  extendedPrice?: number;
 };
 
 type SortKey = 'ticker' | 'price' | 'shares' | 'avgCost' | 'value' | 'pnl' | 'pnlPct' | 'dayPct' | 'weight';
@@ -47,6 +53,28 @@ function compactUsd(value: number) {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
   if (Math.abs(value) >= 1_000) return `$${Math.round(value / 1_000)}K`;
   return `$${Math.round(value).toLocaleString('en-US')}`;
+}
+
+function priceSessionText(session?: PriceSession) {
+  if (session === 'pre') return '프리장';
+  if (session === 'post') return '애프터장';
+  if (session === 'regular') return '정규장';
+  return '종가 기준';
+}
+
+function priceSessionClass(session?: PriceSession) {
+  if (session === 'pre') return 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200';
+  if (session === 'post') return 'border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-400/30 dark:bg-violet-400/10 dark:text-violet-200';
+  if (session === 'regular') return 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200';
+  return 'border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300';
+}
+
+function PriceSessionBadge({ session }: { session?: PriceSession }) {
+  return (
+    <span className={`inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-bold ${priceSessionClass(session)}`}>
+      {priceSessionText(session)}
+    </span>
+  );
 }
 
 const darkTooltip = {
@@ -148,7 +176,10 @@ export function PortfolioView(props: {
               </div>
               <div className="text-right">
                 <div className="font-bold">{r.price ? usd(r.price) : '-'}</div>
-                <div className={`text-xs font-semibold ${colorClass(r.dayPct)}`}>{r.price ? pct(r.dayPct) : '-'}</div>
+                <div className="mt-1 flex flex-col items-end gap-1">
+                  <div className={`text-xs font-semibold ${colorClass(r.dayPct)}`}>{r.price ? pct(r.dayPct) : '-'}</div>
+                  {r.price ? <PriceSessionBadge session={r.priceSession} /> : null}
+                </div>
               </div>
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
@@ -205,7 +236,9 @@ export function PortfolioView(props: {
                   </div>
                   <div className="text-xs text-sub">{r.name}</div>
                 </td>
-                <td className="px-3 py-3 text-right font-semibold">{r.price ? usd(r.price) : '-'}</td>
+                <td className="px-3 py-3 text-right font-semibold">
+                  {r.price ? <div className="flex flex-col items-end gap-1"><span>{usd(r.price)}</span><PriceSessionBadge session={r.priceSession} /></div> : '-'}
+                </td>
                 <td className="px-3 py-3 text-right">{r.shares}</td>
                 <td className="px-3 py-3 text-right text-sub">{usd(r.avgCost)}</td>
                 <td className="px-3 py-3 text-right font-semibold">{r.price ? money(r.value, props.krw, props.rate) : '-'}</td>
@@ -484,7 +517,10 @@ export function WatchView({
                 </div>
                 <div className="text-right">
                   <div className="font-bold">{price ? usd(price) : '-'}</div>
-                  <div className={`text-xs font-semibold ${colorClass(prices[w.ticker]?.changePercent ?? 0)}`}>{prices[w.ticker] ? pct(prices[w.ticker].changePercent ?? 0) : '-'}</div>
+                  <div className="mt-1 flex flex-col items-end gap-1">
+                    <div className={`text-xs font-semibold ${colorClass(prices[w.ticker]?.changePercent ?? 0)}`}>{prices[w.ticker] ? pct(prices[w.ticker].changePercent ?? 0) : '-'}</div>
+                    {price ? <PriceSessionBadge session={prices[w.ticker]?.session} /> : null}
+                  </div>
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
@@ -518,7 +554,9 @@ export function WatchView({
             return (
               <tr key={w.ticker} className="border-t border-border hover:bg-bg">
                 <td className="px-3 py-3"><strong className="text-brand">{w.ticker}</strong><div className="text-xs text-sub">{w.name}</div></td>
-                <td className="px-3 py-3 text-right font-semibold">{price ? usd(price) : '-'}</td>
+                <td className="px-3 py-3 text-right font-semibold">
+                  {price ? <div className="flex flex-col items-end gap-1"><span>{usd(price)}</span><PriceSessionBadge session={prices[w.ticker]?.session} /></div> : '-'}
+                </td>
                 <td className="px-3 py-3 text-right">{w.targetBuy ? usd(w.targetBuy) : '-'}</td>
                 <td className={`px-3 py-3 text-right font-semibold ${dist === null ? '' : dist <= 0 ? 'text-emerald-600' : dist <= 5 ? 'text-amber-500' : 'text-sub'}`}>
                   {dist === null ? '-' : dist <= 0 ? '도달' : `+${dist.toFixed(1)}%`}

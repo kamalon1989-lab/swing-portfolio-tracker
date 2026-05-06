@@ -51,6 +51,7 @@ export interface LegacyPortfolio {
   hi?: HistoryEntry[];    // history (일별 기록)
   c?: number;             // cash
   m?: Record<string, string>; // ticker memos
+  xh?: boolean;            // use extended-hours prices
   g?: {
     targetAmount: number;
     targetDate: string;

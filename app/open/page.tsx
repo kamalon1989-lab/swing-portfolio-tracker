@@ -69,6 +69,8 @@ export default function OpenPage() {
     setKrw,
     theme,
     setTheme,
+    useExtendedHours,
+    setUseExtendedHours,
     rate,
     status,
     loadingPrices,
@@ -177,6 +179,13 @@ export default function OpenPage() {
                 <button onClick={() => setKrw((v) => !v)} className={`rounded-md border px-2 py-1.5 text-xs font-semibold sm:px-3 sm:text-sm ${krw ? 'border-brand bg-brand/10 text-brand' : 'border-border text-sub'}`}>원화</button>
                 <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="rounded-md border border-border px-2 py-1.5 text-xs font-semibold text-sub sm:px-3 sm:text-sm">
                   {theme === 'dark' ? '라이트' : '다크'}
+                </button>
+                <button
+                  onClick={() => setUseExtendedHours((v) => !v)}
+                  className={`rounded-md border px-2 py-1.5 text-xs font-semibold sm:px-3 sm:text-sm ${useExtendedHours ? 'border-amber-400 bg-amber-400/10 text-amber-600 dark:text-amber-300' : 'border-border text-sub'}`}
+                  title="프리장/애프터장 가격 반영"
+                >
+                  <span className="sm:hidden">확장</span><span className="hidden sm:inline">확장장</span>
                 </button>
                 <button onClick={refreshPrices} className="rounded-md bg-brand px-2 py-1.5 text-xs font-semibold text-white disabled:opacity-60 sm:px-3 sm:text-sm" disabled={loadingPrices}>
                   {loadingPrices ? '조회' : <><span className="sm:hidden">갱신</span><span className="hidden sm:inline">시세 갱신</span></>}

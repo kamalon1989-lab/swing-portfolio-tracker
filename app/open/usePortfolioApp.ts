@@ -30,6 +30,7 @@ import {
   type EarningsItem,
   type GoalConfig,
   type HistoryEntry,
+  type Price,
   type PriceMap,
   type SharePayload,
   type Tab,
@@ -49,6 +50,7 @@ export function usePortfolioApp() {
   const [prices, setPrices] = useState<PriceMap>({});
   const [krw, setKrw] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [useExtendedHours, setUseExtendedHours] = useState(true);
   const [rate, setRate] = useState(0);
   const [status, setStatus] = useState('대기 중');
   const [loadingPrices, setLoadingPrices] = useState(false);
@@ -119,6 +121,7 @@ export function usePortfolioApp() {
     setPrices(readJson<PriceMap>(K.prices, {}));
     setKrw(readJson<boolean>(K.krw, false));
     setTheme(readJson<'light' | 'dark'>(K.theme, 'light'));
+    setUseExtendedHours(readJson<boolean>(K.extendedHours, true));
     setTickerMemos(seedMemos);
     setGoalConfig(localGoal);
     setReady(true);
@@ -140,6 +143,7 @@ export function usePortfolioApp() {
           setJournal(data.j ?? []);
           setHistory(normalizeHistory(data.hi));
           setCash(data.c ?? 0);
+          setUseExtendedHours(data.xh ?? readJson<boolean>(K.extendedHours, true));
           const loadedGoal = data.g ?? localGoal ?? null;
           setGoalConfig(loadedGoal);
           // holding.note / watch.note → tickerMemos 흡수 (tickerMemos에 값이 없는 경우만)
@@ -153,6 +157,7 @@ export function usePortfolioApp() {
           writeJson(K.history, data.hi ?? []);
           writeJson(K.cash, data.c ?? 0);
           writeJson(K.memos, mergedMemos);
+          writeJson(K.extendedHours, data.xh ?? readJson<boolean>(K.extendedHours, true));
           writeJson(K.goal, loadedGoal);
           notify('Firebase 데이터를 불러왔습니다');
         }
@@ -199,9 +204,10 @@ export function usePortfolioApp() {
     writeJson(K.cash, cash);
     writeJson(K.prices, prices);
     writeJson(K.krw, krw);
+    writeJson(K.extendedHours, useExtendedHours);
     writeJson(K.memos, tickerMemos);
     writeJson(K.goal, goalConfig);
-  }, [ready, demo, holdings, watch, journal, history, cash, prices, krw, tickerMemos, goalConfig]);
+  }, [ready, demo, holdings, watch, journal, history, cash, prices, krw, useExtendedHours, tickerMemos, goalConfig]);
 
   useEffect(() => {
     if (!pdfPayload) return;
@@ -222,6 +228,7 @@ export function usePortfolioApp() {
           hi: history,
           c: cash,
           m: tickerMemos,
+          xh: useExtendedHours,
           g: goalConfig,
         });
         setStatus('Firebase 동기화 완료');
@@ -229,18 +236,23 @@ export function usePortfolioApp() {
         setStatus('Firebase 동기화 실패');
       }
     }, 1200);
-  }, [user, demo, holdings, watch, journal, history, cash, tickerMemos, goalConfig]);
+  }, [user, demo, holdings, watch, journal, history, cash, tickerMemos, useExtendedHours, goalConfig]);
 
   const rows = useMemo(() => {
     let totalValue = 0;
     const enriched = holdings.map((h) => {
-      const price = prices[h.ticker]?.price ?? 0;
+      const quote = prices[h.ticker];
+      const price = quote?.price ?? 0;
       const value = price * h.shares;
       const cost = h.avgCost * h.shares;
       totalValue += value;
       return {
         ...h,
         price,
+        priceSession: quote?.session,
+        priceSource: quote?.source,
+        regularPrice: quote?.regularPrice,
+        extendedPrice: quote?.extendedPrice,
         value,
         cost,
         pnl: value - cost,
@@ -296,19 +308,37 @@ export function usePortfolioApp() {
         .then((d) => setRate(d.rates.KRW || 0))
         .catch(() => undefined);
       const token = await current.getIdToken();
-      const results = await Promise.all(
-        tickers.map((ticker) =>
-          fetch(`/api/finnhub/quote?symbol=${encodeURIComponent(ticker)}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-            .then((res) => res.ok ? res.json() : null)
-            .catch(() => null)
-            .then((data) => ({ ticker, data }))
-        )
-      );
       const next: PriceMap = { ...prices };
-      for (const { ticker, data } of results) {
-        if (data?.c) next[ticker] = { price: data.c, changePercent: data.dp ?? 0, prevClose: data.pc ?? data.c };
+      const yahooQuotes = await fetch(`/api/market/quote?symbols=${encodeURIComponent(tickers.join(','))}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => res.ok ? res.json() : null)
+        .catch(() => null);
+      const yahooMap = new Map<string, unknown>(
+        ((yahooQuotes?.quotes ?? []) as Array<{ symbol?: string }>)
+          .filter((item) => item.symbol)
+          .map((item) => [String(item.symbol).toUpperCase(), item])
+      );
+      const missing: string[] = [];
+      for (const ticker of tickers) {
+        const parsed = parseYahooQuote(yahooMap.get(ticker), useExtendedHours);
+        if (parsed) next[ticker] = parsed;
+        else missing.push(ticker);
+      }
+      if (missing.length) {
+        const fallbackResults = await Promise.all(
+          missing.map((ticker) =>
+            fetch(`/api/finnhub/quote?symbol=${encodeURIComponent(ticker)}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+              .then((res) => res.ok ? res.json() : null)
+              .catch(() => null)
+              .then((data) => ({ ticker, data }))
+          )
+        );
+        for (const { ticker, data } of fallbackResults) {
+          if (data?.c) next[ticker] = { price: data.c, changePercent: data.dp ?? 0, prevClose: data.pc ?? data.c, session: 'regular', source: 'finnhub' };
+        }
       }
       setPrices(next);
       setStatus(`${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 시세 갱신`);
@@ -329,6 +359,37 @@ export function usePortfolioApp() {
     });
     if (!res.ok) throw new Error(String(res.status));
     return res.json();
+  }
+
+  function parseYahooQuote(raw: unknown, allowExtendedHours: boolean): Price | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const item = raw as Record<string, unknown>;
+    const regular = numberValue(item.regularMarketPrice);
+    const prevClose = numberValue(item.regularMarketPreviousClose) ?? regular;
+    const marketState = String(item.marketState ?? '').toUpperCase();
+    const pre = numberValue(item.preMarketPrice);
+    const post = numberValue(item.postMarketPrice);
+    const regularPct = numberValue(item.regularMarketChangePercent);
+    const prePct = numberValue(item.preMarketChangePercent);
+    const postPct = numberValue(item.postMarketChangePercent);
+    if (!regular && !pre && !post) return null;
+
+    if (allowExtendedHours && (marketState === 'PRE' || marketState === 'PREPRE') && pre) {
+      return { price: pre, changePercent: prePct ?? percentFromPrev(pre, prevClose), prevClose: prevClose ?? pre, session: 'pre', source: 'yahoo', regularPrice: regular ?? undefined, extendedPrice: pre };
+    }
+    if (allowExtendedHours && (marketState === 'POST' || marketState === 'POSTPOST') && post) {
+      return { price: post, changePercent: postPct ?? percentFromPrev(post, prevClose), prevClose: prevClose ?? post, session: 'post', source: 'yahoo', regularPrice: regular ?? undefined, extendedPrice: post };
+    }
+    const price = regular ?? pre ?? post!;
+    return { price, changePercent: regularPct ?? percentFromPrev(price, prevClose), prevClose: prevClose ?? price, session: marketState === 'REGULAR' ? 'regular' : 'closed', source: 'yahoo', regularPrice: regular ?? undefined };
+  }
+
+  function numberValue(value: unknown) {
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  }
+
+  function percentFromPrev(price: number, prev?: number | null) {
+    return prev ? ((price - prev) / prev) * 100 : 0;
   }
 
   async function refreshEarnings() {
@@ -585,6 +646,8 @@ export function usePortfolioApp() {
     setKrw,
     theme,
     setTheme,
+    useExtendedHours,
+    setUseExtendedHours,
     rate,
     status,
     loadingPrices,

@@ -1,7 +1,17 @@
 import type { HoldingItem, JournalItem, WatchItem } from '@/lib/firebase';
 
 export type Tab = 'portfolio' | 'assets' | 'watchlist' | 'journal';
-export type Price = { price: number; changePercent?: number; prevClose?: number; error?: string };
+export type PriceSession = 'pre' | 'regular' | 'post' | 'closed';
+export type Price = {
+  price: number;
+  changePercent?: number;
+  prevClose?: number;
+  session?: PriceSession;
+  source?: 'yahoo' | 'finnhub' | 'demo';
+  regularPrice?: number;
+  extendedPrice?: number;
+  error?: string;
+};
 export type PriceMap = Record<string, Price>;
 export type HistoryEntry = {
   date: string;
@@ -54,6 +64,7 @@ export const K = {
   theme: 'ptf_theme',
   memos: 'ptf_memos',
   goal: 'ptf_goal',
+  extendedHours: 'ptf_ext_hours',
 };
 
 export const demoHoldings: HoldingItem[] = [
@@ -76,13 +87,13 @@ export const demoJournal: JournalItem[] = [
 ];
 
 export const demoPrices: PriceMap = {
-  NVDA: { price: 875.4, changePercent: 2.15, prevClose: 856.8 },
-  MSFT: { price: 425.3, changePercent: 1.2, prevClose: 420.25 },
-  GOOGL: { price: 178.9, changePercent: 0.65, prevClose: 177.74 },
-  AMD: { price: 163.8, changePercent: 3.21, prevClose: 158.7 },
-  META: { price: 512.6, changePercent: 1.85, prevClose: 503.25 },
-  PLTR: { price: 82.1, changePercent: 2.1, prevClose: 80.41 },
-  SMCI: { price: 45.8, changePercent: -1.2, prevClose: 46.36 },
+  NVDA: { price: 875.4, changePercent: 2.15, prevClose: 856.8, session: 'regular', source: 'demo' },
+  MSFT: { price: 425.3, changePercent: 1.2, prevClose: 420.25, session: 'regular', source: 'demo' },
+  GOOGL: { price: 178.9, changePercent: 0.65, prevClose: 177.74, session: 'regular', source: 'demo' },
+  AMD: { price: 163.8, changePercent: 3.21, prevClose: 158.7, session: 'regular', source: 'demo' },
+  META: { price: 512.6, changePercent: 1.85, prevClose: 503.25, session: 'regular', source: 'demo' },
+  PLTR: { price: 82.1, changePercent: 2.1, prevClose: 80.41, session: 'regular', source: 'demo' },
+  SMCI: { price: 45.8, changePercent: -1.2, prevClose: 46.36, session: 'regular', source: 'demo' },
 };
 
 export function readJson<T>(key: string, fallback: T): T {
