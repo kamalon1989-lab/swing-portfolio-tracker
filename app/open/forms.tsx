@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import type { HoldingItem, JournalItem, WatchItem } from '@/lib/firebase';
-import { today, type GoalConfig, type HistoryEntry, type InvestStyle } from './model';
+import { today, usd, type GoalConfig, type HistoryEntry, type InvestStyle } from './model';
 
 export function HoldingForm({
   item,
@@ -66,10 +66,16 @@ export function TradeForm({
   onClose: () => void;
 }) {
   const [form, setForm] = useState<JournalItem>(item ?? { id: '', date: today(), action: 'buy', ticker: '', shares: 0, price: 0, fee: 0, note: '' });
+  const initialFeePct = item && item.shares && item.price
+    ? String(Number((((item.fee ?? 0) / (item.shares * item.price)) * 100).toFixed(4)))
+    : '0.25';
+  const [feePct, setFeePct] = useState(initialFeePct);
   const [sync, setSync] = useState(!item);
+  const tradeAmount = (Number(form.shares) || 0) * (Number(form.price) || 0);
+  const feeAmount = tradeAmount * ((Number(feePct) || 0) / 100);
   function submit(e: FormEvent) {
     e.preventDefault();
-    onSave(form, sync);
+    onSave({ ...form, fee: feeAmount }, sync);
   }
   return (
     <Modal title={item ? '거래 수정' : '거래 추가'} onClose={onClose}>
@@ -79,7 +85,10 @@ export function TradeForm({
         <Field label="티커" required><input className={`${inputClass()} uppercase`} value={form.ticker} onChange={(e) => setForm({ ...form, ticker: e.target.value.toUpperCase() })} /></Field>
         <Field label="수량" required><input className={inputClass()} type="number" step="0.0001" value={form.shares || ''} onChange={(e) => setForm({ ...form, shares: Number(e.target.value) })} /></Field>
         <Field label="단가" required><input className={inputClass()} type="number" step="0.01" value={form.price || ''} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} /></Field>
-        <Field label="수수료" optional><input className={inputClass()} type="number" step="0.01" value={form.fee || ''} onChange={(e) => setForm({ ...form, fee: Number(e.target.value) })} /></Field>
+        <Field label="수수료율 (%)" optional>
+          <input className={inputClass()} type="number" step="0.01" min="0" value={feePct} onChange={(e) => setFeePct(e.target.value)} />
+          <div className="mt-1 text-xs text-sub">예상 수수료 {usd(feeAmount)}</div>
+        </Field>
         <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={sync} disabled={!!item} onChange={(e) => setSync(e.target.checked)} /> 보유 종목과 예수금에 반영</label>
         <Field label="전략" optional>
           <input list="strategy-list" className={inputClass()} value={form.strategy ?? ''} placeholder="예: 브레이크아웃, 눌림목..." onChange={(e) => setForm({ ...form, strategy: e.target.value })} />

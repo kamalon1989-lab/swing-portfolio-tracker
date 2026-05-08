@@ -5,6 +5,8 @@ export type PriceSession = 'pre' | 'regular' | 'post' | 'closed';
 export type Price = {
   price: number;
   changePercent?: number;
+  regularChangePercent?: number;
+  extendedChangePercent?: number;
   prevClose?: number;
   session?: PriceSession;
   source?: 'yahoo' | 'finnhub' | 'demo';

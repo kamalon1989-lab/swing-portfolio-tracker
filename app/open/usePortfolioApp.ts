@@ -253,6 +253,8 @@ export function usePortfolioApp() {
         priceSource: quote?.source,
         regularPrice: quote?.regularPrice,
         extendedPrice: quote?.extendedPrice,
+        regularChangePercent: quote?.regularChangePercent,
+        extendedChangePercent: quote?.extendedChangePercent,
         value,
         cost,
         pnl: value - cost,
@@ -337,7 +339,7 @@ export function usePortfolioApp() {
           )
         );
         for (const { ticker, data } of fallbackResults) {
-          if (data?.c) next[ticker] = { price: data.c, changePercent: data.dp ?? 0, prevClose: data.pc ?? data.c, session: 'regular', source: 'finnhub' };
+          if (data?.c) next[ticker] = { price: data.c, changePercent: data.dp ?? 0, regularChangePercent: data.dp ?? 0, prevClose: data.pc ?? data.c, session: 'regular', source: 'finnhub' };
         }
       }
       setPrices(next);
@@ -373,15 +375,19 @@ export function usePortfolioApp() {
     const prePct = numberValue(item.preMarketChangePercent);
     const postPct = numberValue(item.postMarketChangePercent);
     if (!regular && !pre && !post) return null;
+    const baseRegularPct = regular ? regularPct ?? percentFromPrev(regular, prevClose) : undefined;
 
     if (allowExtendedHours && (marketState === 'PRE' || marketState === 'PREPRE') && pre) {
-      return { price: pre, changePercent: prePct ?? percentFromPrev(pre, prevClose), prevClose: prevClose ?? pre, session: 'pre', source: 'yahoo', regularPrice: regular ?? undefined, extendedPrice: pre };
+      const extendedPct = prePct ?? percentFromPrev(pre, prevClose);
+      return { price: pre, changePercent: extendedPct, regularChangePercent: baseRegularPct, extendedChangePercent: extendedPct, prevClose: prevClose ?? pre, session: 'pre', source: 'yahoo', regularPrice: regular ?? undefined, extendedPrice: pre };
     }
     if (allowExtendedHours && (marketState === 'POST' || marketState === 'POSTPOST') && post) {
-      return { price: post, changePercent: postPct ?? percentFromPrev(post, prevClose), prevClose: prevClose ?? post, session: 'post', source: 'yahoo', regularPrice: regular ?? undefined, extendedPrice: post };
+      const extendedPct = postPct ?? percentFromPrev(post, prevClose);
+      return { price: post, changePercent: extendedPct, regularChangePercent: baseRegularPct, extendedChangePercent: extendedPct, prevClose: prevClose ?? post, session: 'post', source: 'yahoo', regularPrice: regular ?? undefined, extendedPrice: post };
     }
     const price = regular ?? pre ?? post!;
-    return { price, changePercent: regularPct ?? percentFromPrev(price, prevClose), prevClose: prevClose ?? price, session: marketState === 'REGULAR' ? 'regular' : 'closed', source: 'yahoo', regularPrice: regular ?? undefined };
+    const changePercent = regularPct ?? percentFromPrev(price, prevClose);
+    return { price, changePercent, regularChangePercent: changePercent, prevClose: prevClose ?? price, session: marketState === 'REGULAR' ? 'regular' : 'closed', source: 'yahoo', regularPrice: regular ?? undefined };
   }
 
   function numberValue(value: unknown) {

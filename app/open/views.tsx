@@ -42,6 +42,8 @@ type HoldingRow = HoldingItem & {
   priceSource?: Price['source'];
   regularPrice?: number;
   extendedPrice?: number;
+  regularChangePercent?: number;
+  extendedChangePercent?: number;
 };
 
 type SortKey = 'ticker' | 'price' | 'shares' | 'avgCost' | 'value' | 'pnl' | 'pnlPct' | 'dayPct' | 'weight';
@@ -74,6 +76,31 @@ function PriceSessionBadge({ session }: { session?: PriceSession }) {
     <span className={`inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-bold ${priceSessionClass(session)}`}>
       {priceSessionText(session)}
     </span>
+  );
+}
+
+function PriceChangeStack({
+  quote,
+  fallbackPct,
+}: {
+  quote?: Pick<Price, 'changePercent' | 'regularChangePercent' | 'extendedChangePercent' | 'session'>;
+  fallbackPct?: number;
+}) {
+  const regularPct = quote?.regularChangePercent ?? fallbackPct ?? quote?.changePercent;
+  const isExtended = quote?.session === 'pre' || quote?.session === 'post';
+  const extendedPct = isExtended ? quote?.extendedChangePercent ?? quote?.changePercent : undefined;
+  const extendedLabel = quote?.session === 'pre' ? 'p' : quote?.session === 'post' ? 'a' : '';
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <span className={`text-xs font-semibold ${regularPct === undefined ? 'text-sub' : colorClass(regularPct)}`}>
+        {regularPct === undefined ? '-' : pct(regularPct)}
+      </span>
+      {extendedLabel && extendedPct !== undefined ? (
+        <span className={`text-[11px] font-bold ${colorClass(extendedPct)}`}>
+          {extendedLabel} {pct(extendedPct)}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -165,8 +192,9 @@ export function PortfolioView(props: {
           <button onClick={props.onRecord} className="rounded-lg border border-border px-3 py-1.5 text-xs font-bold">오늘 기록</button>
         </div>
         {sortedRows.map((r) => (
-          <button key={r.ticker} type="button" onClick={() => openMobileTicker(r.ticker)} className="w-full rounded-2xl border border-border bg-card p-4 text-left shadow-sm">
-            <div className="flex items-start justify-between gap-3">
+          <div key={r.ticker} className="w-full rounded-2xl border border-border bg-card p-4 text-left shadow-sm">
+            <button type="button" onClick={() => openMobileTicker(r.ticker)} className="w-full text-left">
+              <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <strong className="text-lg text-brand">{r.ticker}</strong>
@@ -177,12 +205,22 @@ export function PortfolioView(props: {
               <div className="text-right">
                 <div className="font-bold">{r.price ? usd(r.price) : '-'}</div>
                 <div className="mt-1 flex flex-col items-end gap-1">
-                  <div className={`text-xs font-semibold ${colorClass(r.dayPct)}`}>{r.price ? pct(r.dayPct) : '-'}</div>
+                  {r.price ? (
+                    <PriceChangeStack
+                      quote={{
+                        changePercent: r.dayPct,
+                        regularChangePercent: r.regularChangePercent,
+                        extendedChangePercent: r.extendedChangePercent,
+                        session: r.priceSession,
+                      }}
+                      fallbackPct={r.dayPct}
+                    />
+                  ) : <span className="text-xs font-semibold text-sub">-</span>}
                   {r.price ? <PriceSessionBadge session={r.priceSession} /> : null}
                 </div>
               </div>
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
               <div className="rounded-xl bg-bg p-2">
                 <div className="text-sub">평가</div>
                 <div className="mt-1 font-bold">{r.price ? money(r.value, props.krw, props.rate) : '-'}</div>
@@ -195,12 +233,18 @@ export function PortfolioView(props: {
                 <div className="text-sub">수익률</div>
                 <div className={`mt-1 font-bold ${colorClass(r.pnlPct)}`}>{r.price ? pct(r.pnlPct) : '-'}</div>
               </div>
-            </div>
-            <div className="mt-3 flex items-center justify-between gap-2 text-xs text-sub">
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-2 text-xs text-sub">
               <span>수량 {r.shares} · 비중 {r.weight.toFixed(1)}%</span>
               <span>{r.targetPrice ? `목표 ${usd(r.targetPrice)}` : '목표 없음'}</span>
+              </div>
+            </button>
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" onClick={() => openMobileTicker(r.ticker)} className="rounded-md border border-border px-2 py-1 text-xs font-bold text-slate-700 dark:text-slate-200">상세</button>
+              <button type="button" onClick={() => props.onEdit(r)} className="rounded-md border border-border px-2 py-1 text-xs font-bold text-brand">수정</button>
+              <button type="button" onClick={() => props.onDelete(r.ticker)} className="rounded-md border border-rose-200 px-2 py-1 text-xs font-bold text-rose-600">삭제</button>
             </div>
-          </button>
+          </div>
         ))}
         {!props.rows.length && <div className="rounded-xl bg-card p-10 text-center text-sm text-sub">보유 종목이 없습니다.</div>}
       </div>
@@ -244,7 +288,19 @@ export function PortfolioView(props: {
                 <td className="px-3 py-3 text-right font-semibold">{r.price ? money(r.value, props.krw, props.rate) : '-'}</td>
                 <td className={`px-3 py-3 text-right font-semibold ${colorClass(r.pnl)}`}>{r.price ? money(r.pnl, props.krw, props.rate) : '-'}</td>
                 <td className={`px-3 py-3 text-right font-semibold ${colorClass(r.pnlPct)}`}>{r.price ? pct(r.pnlPct) : '-'}</td>
-                <td className={`px-3 py-3 text-right ${colorClass(r.dayPct)}`}>{r.price ? pct(r.dayPct) : '-'}</td>
+                <td className="px-3 py-3 text-right">
+                  {r.price ? (
+                    <PriceChangeStack
+                      quote={{
+                        changePercent: r.dayPct,
+                        regularChangePercent: r.regularChangePercent,
+                        extendedChangePercent: r.extendedChangePercent,
+                        session: r.priceSession,
+                      }}
+                      fallbackPct={r.dayPct}
+                    />
+                  ) : '-'}
+                </td>
                 <td className="px-3 py-3 text-right text-xs text-sub"><TargetStopCell row={r} /></td>
                 <td className="px-3 py-3 text-right text-xs font-semibold"><RRCell row={r} /></td>
                 <td className="px-3 py-3 text-right">{r.weight.toFixed(1)}%</td>
@@ -518,7 +574,7 @@ export function WatchView({
                 <div className="text-right">
                   <div className="font-bold">{price ? usd(price) : '-'}</div>
                   <div className="mt-1 flex flex-col items-end gap-1">
-                    <div className={`text-xs font-semibold ${colorClass(prices[w.ticker]?.changePercent ?? 0)}`}>{prices[w.ticker] ? pct(prices[w.ticker].changePercent ?? 0) : '-'}</div>
+                    <PriceChangeStack quote={prices[w.ticker]} />
                     {price ? <PriceSessionBadge session={prices[w.ticker]?.session} /> : null}
                   </div>
                 </div>
@@ -561,7 +617,7 @@ export function WatchView({
                 <td className={`px-3 py-3 text-right font-semibold ${dist === null ? '' : dist <= 0 ? 'text-emerald-600' : dist <= 5 ? 'text-amber-500' : 'text-sub'}`}>
                   {dist === null ? '-' : dist <= 0 ? '도달' : `+${dist.toFixed(1)}%`}
                 </td>
-                <td className={`px-3 py-3 text-right ${colorClass(prices[w.ticker]?.changePercent ?? 0)}`}>{prices[w.ticker] ? pct(prices[w.ticker].changePercent ?? 0) : '-'}</td>
+                <td className="px-3 py-3 text-right">{prices[w.ticker] ? <PriceChangeStack quote={prices[w.ticker]} /> : '-'}</td>
                 <td className="px-3 py-3 text-sub">{w.note || '-'}</td>
                 <td className="px-3 py-3 text-right"><button onClick={() => onSelectTicker(w.ticker)} className="no-print mr-2 text-slate-700">상세</button><button onClick={() => onEdit(w)} className="no-print mr-2 text-brand">수정</button><button onClick={() => onDelete(w.ticker)} className="no-print text-rose-600">삭제</button></td>
               </tr>
