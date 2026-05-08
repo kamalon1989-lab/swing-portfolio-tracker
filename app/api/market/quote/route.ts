@@ -88,7 +88,8 @@ async function fetchChartQuote(symbol: string) {
       : inPeriod(timestamp, periods?.regular)
         ? 'REGULAR'
         : 'CLOSED';
-  const extendedChangePercent = extendedPrice && prevClose ? ((extendedPrice - prevClose) / prevClose) * 100 : undefined;
+  const extendedBasePrice = regularPrice ?? prevClose;
+  const extendedChangePercent = extendedPrice && extendedBasePrice ? ((extendedPrice - extendedBasePrice) / extendedBasePrice) * 100 : undefined;
   const regularChangePercent = regularPrice && prevClose ? ((regularPrice - prevClose) / prevClose) * 100 : undefined;
 
   return {

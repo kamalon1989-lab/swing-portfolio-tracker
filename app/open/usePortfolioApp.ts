@@ -372,17 +372,16 @@ export function usePortfolioApp() {
     const pre = numberValue(item.preMarketPrice);
     const post = numberValue(item.postMarketPrice);
     const regularPct = numberValue(item.regularMarketChangePercent);
-    const prePct = numberValue(item.preMarketChangePercent);
-    const postPct = numberValue(item.postMarketChangePercent);
     if (!regular && !pre && !post) return null;
     const baseRegularPct = regular ? regularPct ?? percentFromPrev(regular, prevClose) : undefined;
+    const extendedBasePrice = regular ?? prevClose;
 
     if (allowExtendedHours && (marketState === 'PRE' || marketState === 'PREPRE') && pre) {
-      const extendedPct = prePct ?? percentFromPrev(pre, prevClose);
+      const extendedPct = percentFromPrev(pre, extendedBasePrice);
       return { price: pre, changePercent: extendedPct, regularChangePercent: baseRegularPct, extendedChangePercent: extendedPct, prevClose: prevClose ?? pre, session: 'pre', source: 'yahoo', regularPrice: regular ?? undefined, extendedPrice: pre };
     }
     if (allowExtendedHours && (marketState === 'POST' || marketState === 'POSTPOST') && post) {
-      const extendedPct = postPct ?? percentFromPrev(post, prevClose);
+      const extendedPct = percentFromPrev(post, extendedBasePrice);
       return { price: post, changePercent: extendedPct, regularChangePercent: baseRegularPct, extendedChangePercent: extendedPct, prevClose: prevClose ?? post, session: 'post', source: 'yahoo', regularPrice: regular ?? undefined, extendedPrice: post };
     }
     const price = regular ?? pre ?? post!;

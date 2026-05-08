@@ -79,7 +79,7 @@ export function TradeForm({
   }
   return (
     <Modal title={item ? '거래 수정' : '거래 추가'} onClose={onClose}>
-      <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit}>
+      <form className="grid items-start gap-3 sm:grid-cols-2" onSubmit={submit}>
         <Field label="날짜" required><input className={inputClass()} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></Field>
         <Field label="구분" required><select className={inputClass()} value={form.action} onChange={(e) => setForm({ ...form, action: e.target.value as 'buy' | 'sell' })}><option value="buy">매수</option><option value="sell">매도</option></select></Field>
         <Field label="티커" required><input className={`${inputClass()} uppercase`} value={form.ticker} onChange={(e) => setForm({ ...form, ticker: e.target.value.toUpperCase() })} /></Field>
