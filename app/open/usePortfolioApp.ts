@@ -550,13 +550,166 @@ export function usePortfolioApp() {
   }
 
   function exportBackup() {
-    const payload = { exportedAt: new Date().toISOString(), h: holdings, w: watch, j: journal, hi: history, c: cash };
-    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `portfolio_backup_${today()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const payload = buildAiExportPayload();
+      validateAiExport(payload);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `portfolio_ai_export_${fileTimestamp()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      notify('AI 포트폴리오 JSON을 저장했습니다');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Export error';
+      notify(message);
+      console.error(error);
+    }
+  }
+
+  function buildAiExportPayload() {
+    const exportedAt = new Date().toISOString();
+    const maxDrawdownValue = rows.reduce((sum, row) => {
+      if (!row.price || !row.stopLoss || row.price <= row.stopLoss) return sum;
+      return sum + (row.price - row.stopLoss) * row.shares;
+    }, 0);
+    const stockValue = roundNumber(summary.stockValue);
+    const totalAsset = roundNumber(summary.totalAsset);
+    const exportedHoldings = rows.map((row) => {
+      const price = roundNumber(row.price);
+      const shares = roundNumber(row.shares, 4);
+      const avgCost = roundNumber(row.avgCost);
+      const cost = roundNumber(shares * avgCost);
+      const value = roundNumber(shares * price);
+      const pnl = roundNumber(value - cost);
+      const rr = row.price && row.targetPrice && row.stopLoss && row.price > row.stopLoss && row.targetPrice > row.price
+        ? roundNumber((row.targetPrice - row.price) / (row.price - row.stopLoss), 2)
+        : null;
+      return {
+        ticker: row.ticker,
+        name: row.name ?? '',
+        shares,
+        avgCost,
+        cost,
+        price,
+        regularPrice: row.regularPrice ? roundNumber(row.regularPrice) : price,
+        extendedPrice: row.extendedPrice ? roundNumber(row.extendedPrice) : null,
+        priceSession: row.priceSession ?? null,
+        priceSource: row.priceSource ?? null,
+        value,
+        pnl,
+        pnlPct: cost ? roundNumber((pnl / cost) * 100) : 0,
+        dayPct: roundNumber(row.dayPct),
+        weightStock: stockValue ? roundNumber((value / stockValue) * 100) : 0,
+        weightTotal: totalAsset ? roundNumber((value / totalAsset) * 100) : 0,
+        buyDate: row.buyDate ?? null,
+        lastBuyDate: row.lastBuyDate ?? row.buyDate ?? null,
+        stopLoss: row.stopLoss ? roundNumber(row.stopLoss) : null,
+        targetPrice: row.targetPrice ? roundNumber(row.targetPrice) : null,
+        rr,
+        note: tickerMemos[row.ticker] ?? row.note ?? '',
+      };
+    });
+    const exportedTrades = journal.map((trade) => {
+      const shares = roundNumber(trade.shares, 4);
+      const price = roundNumber(trade.price);
+      return {
+        id: trade.id,
+        date: trade.date,
+        side: trade.action.toUpperCase(),
+        ticker: trade.ticker,
+        shares,
+        price,
+        amount: roundNumber(shares * price),
+        fee: roundNumber(trade.fee ?? 0),
+        strategy: trade.strategy || '-',
+        memo: trade.note ?? '',
+      };
+    });
+    const exportedWatchlist = watch.map((item) => {
+      const quote = prices[item.ticker];
+      const currentPrice = quote?.price ? roundNumber(quote.price) : null;
+      const targetEntry = item.targetBuy ? roundNumber(item.targetBuy) : null;
+      const distancePct = currentPrice && targetEntry
+        ? roundNumber(Math.max(0, ((currentPrice - targetEntry) / currentPrice) * 100))
+        : null;
+      return {
+        ticker: item.ticker,
+        name: item.name ?? '',
+        currentPrice,
+        targetEntry,
+        distancePct,
+        dayPct: quote?.changePercent === undefined ? null : roundNumber(quote.changePercent),
+        memo: tickerMemos[item.ticker] ?? item.note ?? '',
+      };
+    });
+
+    return {
+      schemaVersion: '2.0',
+      exportPurpose: 'ai_portfolio_analysis',
+      summary: {
+        exportedAt,
+        stockValue,
+        cash: roundNumber(cash),
+        totalAsset,
+        totalCost: roundNumber(summary.totalCost),
+        totalPnl: roundNumber(summary.totalPnl),
+        totalPnlPct: roundNumber(summary.totalPnlPct),
+        todayPnl: roundNumber(summary.dayPnl),
+        maxDrawdown: roundNumber(-maxDrawdownValue),
+        maxDrawdownPct: totalAsset ? roundNumber((maxDrawdownValue / totalAsset) * 100) : 0,
+      },
+      holdings: exportedHoldings,
+      trades: exportedTrades,
+      watchlist: exportedWatchlist,
+      history,
+    };
+  }
+
+  function validateAiExport(data: ReturnType<typeof buildAiExportPayload>) {
+    const required = ['ticker', 'shares', 'avgCost', 'price', 'value', 'pnl', 'pnlPct', 'weightStock', 'weightTotal'] as const;
+    const holdingsSum = roundNumber(data.holdings.reduce((sum, item) => sum + item.value, 0));
+    if (!withinTolerance(holdingsSum, data.summary.stockValue, 1)) {
+      throw new Error('Export error: holdings value sum does not match stockValue');
+    }
+    if (!withinTolerance(data.summary.stockValue + data.summary.cash, data.summary.totalAsset, 1)) {
+      throw new Error('Export error: totalAsset does not match stockValue + cash');
+    }
+    for (const holding of data.holdings) {
+      for (const key of required) {
+        const value = holding[key];
+        if (value === undefined || value === null || (typeof value === 'number' && !Number.isFinite(value))) {
+          throw new Error(`Export error: missing ${key} for ${holding.ticker}`);
+        }
+      }
+      if (holding.shares <= 0 || holding.price <= 0) {
+        throw new Error(`Export error: missing live price or shares for ${holding.ticker}`);
+      }
+      const expectedValue = roundNumber(holding.shares * holding.price);
+      if (!withinTolerance(expectedValue, holding.value, Math.max(1, Math.abs(holding.value) * 0.005))) {
+        throw new Error(`Export error: invalid value for ${holding.ticker}`);
+      }
+      const expectedCost = roundNumber(holding.shares * holding.avgCost);
+      const expectedPnl = roundNumber(holding.value - expectedCost);
+      if (!withinTolerance(expectedPnl, holding.pnl, Math.max(1, Math.abs(holding.pnl) * 0.005))) {
+        throw new Error(`Export error: invalid pnl for ${holding.ticker}`);
+      }
+    }
+  }
+
+  function withinTolerance(expected: number, actual: number, tolerance: number) {
+    return Math.abs(expected - actual) <= tolerance;
+  }
+
+  function roundNumber(value: number, digits = 2) {
+    if (!Number.isFinite(value)) return 0;
+    const scale = 10 ** digits;
+    return Math.round(value * scale) / scale;
+  }
+
+  function fileTimestamp() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
   }
 
   function makeShareUrl() {

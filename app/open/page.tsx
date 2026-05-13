@@ -167,7 +167,7 @@ export default function OpenPage() {
                 { label: '포지션 계산', onClick: () => setShowSizingForm(true) },
                 { label: '공유 링크', onClick: makeShareUrl },
                 { label: 'PDF 내보내기', onClick: exportPdfReport },
-                { label: '백업 저장', onClick: exportBackup },
+                { label: 'AI JSON 저장', onClick: exportBackup },
               ]} />
             </div>
           )}
