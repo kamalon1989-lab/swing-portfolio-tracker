@@ -863,6 +863,7 @@ export function PaperTradingView({
   onDeleteTrade,
   onExport,
   onImport,
+  onImportText,
   onClonePortfolio,
 }: {
   accounts: PaperAccount[];
@@ -877,10 +878,13 @@ export function PaperTradingView({
   onDeleteTrade: (id: string) => void;
   onExport: () => void;
   onImport: (file: File) => void;
+  onImportText: (text: string) => void;
   onClonePortfolio: () => void;
 }) {
   const [importKey, setImportKey] = useState(0);
   const [showPrompt, setShowPrompt] = useState(false);
+  const [showPasteImport, setShowPasteImport] = useState(false);
+  const [pasteJson, setPasteJson] = useState('');
   const selected = snapshots.find((item) => item.account.id === selectedAccountId) ?? snapshots[0];
   const ranking = [...snapshots].sort((a, b) => b.summary.totalPnlPct - a.summary.totalPnlPct);
   const importPrompt = `아래 JSON 스키마에 맞춰 모의투자 데이터를 만들어줘. 실제 포트폴리오 AI export와 섞지 말고, 모의투자 전용으로만 작성해줘.
@@ -936,6 +940,7 @@ export function PaperTradingView({
         <button onClick={onExport} disabled={!accounts.length} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-40">모의 내보내기</button>
         <button onClick={onClonePortfolio} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">현재 포트폴리오 복사</button>
         <button onClick={() => setShowPrompt((v) => !v)} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">AI 입력 예시</button>
+        <button onClick={() => setShowPasteImport((v) => !v)} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">JSON 붙여넣기</button>
         <label className="cursor-pointer rounded-lg border border-border px-3 py-2 text-sm font-bold">
           모의 가져오기
           <input
@@ -968,6 +973,45 @@ export function PaperTradingView({
             </button>
           </div>
           <pre className="mt-3 max-h-80 overflow-auto rounded-xl bg-slate-950 p-4 text-xs leading-5 text-slate-100">{importPrompt}</pre>
+        </div>
+      )}
+
+      {showPasteImport && (
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="font-bold">모의투자 JSON 붙여넣기</h3>
+              <p className="mt-1 text-xs text-sub">GPT가 만든 JSON을 그대로 붙여넣고 불러오면 됩니다. 기존 모의투자 데이터는 붙여넣은 내용으로 교체됩니다.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard?.readText().then((text) => setPasteJson(text))}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-bold text-brand"
+            >
+              클립보드 붙여넣기
+            </button>
+          </div>
+          <textarea
+            className="mt-3 h-72 w-full resize-y rounded-xl border border-border bg-bg p-3 font-mono text-xs outline-none focus:border-brand"
+            value={pasteJson}
+            placeholder='{"schemaVersion":"1.0","exportPurpose":"paper_trading","accounts":[],"trades":[]}'
+            onChange={(e) => setPasteJson(e.target.value)}
+          />
+          <div className="mt-3 flex justify-end gap-2">
+            <button type="button" onClick={() => setPasteJson('')} className="rounded-lg border border-border px-3 py-2 text-sm font-bold text-sub">비우기</button>
+            <button
+              type="button"
+              onClick={() => {
+                onImportText(pasteJson);
+                setShowPasteImport(false);
+                setPasteJson('');
+              }}
+              disabled={!pasteJson.trim()}
+              className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white disabled:opacity-40"
+            >
+              붙여넣은 JSON 불러오기
+            </button>
+          </div>
         </div>
       )}
 

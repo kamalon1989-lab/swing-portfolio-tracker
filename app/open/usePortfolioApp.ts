@@ -849,7 +849,15 @@ export function usePortfolioApp() {
 
   async function importPaperTrading(file: File) {
     try {
-      const data = JSON.parse(await file.text()) as { accounts?: PaperAccount[]; trades?: PaperTrade[] };
+      importPaperTradingJson(await file.text());
+    } catch (error) {
+      notify(error instanceof Error ? error.message : '모의투자 가져오기에 실패했습니다');
+    }
+  }
+
+  function importPaperTradingJson(raw: string) {
+    try {
+      const data = JSON.parse(raw) as { accounts?: PaperAccount[]; trades?: PaperTrade[] };
       if (!Array.isArray(data.accounts) || !Array.isArray(data.trades)) throw new Error('모의투자 JSON 형식이 아닙니다');
       setPaperAccounts(data.accounts);
       setPaperTrades(data.trades);
@@ -1067,6 +1075,7 @@ export function usePortfolioApp() {
     deletePaperTrade,
     exportPaperTrading,
     importPaperTrading,
+    importPaperTradingJson,
     cloneCurrentPortfolioToPaper,
     pdfPayload,
     setPdfPayload,

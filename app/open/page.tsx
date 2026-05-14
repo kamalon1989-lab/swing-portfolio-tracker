@@ -143,6 +143,7 @@ export default function OpenPage() {
     deletePaperTrade,
     exportPaperTrading,
     importPaperTrading,
+    importPaperTradingJson,
     cloneCurrentPortfolioToPaper,
   } = app;
 
@@ -323,6 +324,7 @@ export default function OpenPage() {
               onDeleteTrade={deletePaperTrade}
               onExport={exportPaperTrading}
               onImport={importPaperTrading}
+              onImportText={importPaperTradingJson}
               onClonePortfolio={cloneCurrentPortfolioToPaper}
             />
           )}
