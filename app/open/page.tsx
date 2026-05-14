@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CashForm, GoalForm, HistoryForm, HoldingForm, PositionSizingForm, RecordDateForm, TradeForm, WatchForm } from './forms';
+import { CashForm, GoalForm, HistoryForm, HoldingForm, PaperAccountForm, PaperTradeForm, PositionSizingForm, RecordDateForm, TradeForm, WatchForm } from './forms';
 import { AssetsView, MobileTabs, PortfolioPdfReport, ShareView } from './panels';
-import { JournalView, PortfolioView, WatchView } from './views';
+import { JournalView, PaperTradingView, PortfolioView, WatchView } from './views';
 import { usePortfolioApp } from './usePortfolioApp';
 
 function MarketSessionBadge() {
@@ -125,6 +125,24 @@ export default function OpenPage() {
     showGoalForm,
     setShowGoalForm,
     saveGoal,
+    paperAccounts,
+    paperSnapshots,
+    selectedPaperAccountId,
+    setSelectedPaperAccountId,
+    editingPaperAccount,
+    setEditingPaperAccount,
+    editingPaperTrade,
+    setEditingPaperTrade,
+    showPaperAccountForm,
+    setShowPaperAccountForm,
+    showPaperTradeForm,
+    setShowPaperTradeForm,
+    savePaperAccount,
+    deletePaperAccount,
+    savePaperTrade,
+    deletePaperTrade,
+    exportPaperTrading,
+    importPaperTrading,
   } = app;
 
   if (!ready) return <main className="min-h-screen grid place-items-center text-slate-500">불러오는 중...</main>;
@@ -152,6 +170,7 @@ export default function OpenPage() {
                 ['assets', '자산 분석'],
                 ['watchlist', '관심 종목'],
                 ['journal', '매매 일지'],
+                ['paper', '모의투자'],
               ] as const).map(([key, label]) => (
                 <button key={key} onClick={() => setTab(key)} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${tab === key ? 'bg-card text-brand shadow-sm' : 'text-sub hover:text-text'}`}>
                   {label}
@@ -289,6 +308,22 @@ export default function OpenPage() {
               onDelete={(id) => setJournal((prev) => prev.filter((x) => x.id !== id))}
             />
           )}
+          {tab === 'paper' && (
+            <PaperTradingView
+              accounts={paperAccounts}
+              snapshots={paperSnapshots}
+              selectedAccountId={selectedPaperAccountId}
+              onSelectAccount={setSelectedPaperAccountId}
+              onAddAccount={() => { setEditingPaperAccount(null); setShowPaperAccountForm(true); }}
+              onEditAccount={(item) => { setEditingPaperAccount(item); setShowPaperAccountForm(true); }}
+              onDeleteAccount={deletePaperAccount}
+              onAddTrade={() => { setEditingPaperTrade(null); setShowPaperTradeForm(true); }}
+              onEditTrade={(item) => { setEditingPaperTrade(item); setShowPaperTradeForm(true); }}
+              onDeleteTrade={deletePaperTrade}
+              onExport={exportPaperTrading}
+              onImport={importPaperTrading}
+            />
+          )}
         </div>
       )}
 
@@ -296,6 +331,8 @@ export default function OpenPage() {
       {showHoldingForm && <HoldingForm item={editingHolding} onClose={() => setShowHoldingForm(false)} onSave={saveHolding} />}
       {showWatchForm && <WatchForm item={editingWatch} onClose={() => setShowWatchForm(false)} onSave={saveWatch} />}
       {showTradeForm && <TradeForm item={editingTrade} onClose={() => setShowTradeForm(false)} onSave={saveTrade} />}
+      {showPaperAccountForm && <PaperAccountForm item={editingPaperAccount} onClose={() => setShowPaperAccountForm(false)} onSave={savePaperAccount} />}
+      {showPaperTradeForm && <PaperTradeForm item={editingPaperTrade} accountId={selectedPaperAccountId || paperAccounts[0]?.id || ''} accounts={paperAccounts} onClose={() => setShowPaperTradeForm(false)} onSave={savePaperTrade} />}
       {showCashForm && <CashForm cash={cash} onClose={() => setShowCashForm(false)} onSave={saveCash} />}
       {showRecordForm && <RecordDateForm onClose={() => setShowRecordForm(false)} onSave={recordToday} />}
       {showHistoryForm && editingHistory && <HistoryForm entry={editingHistory} onClose={() => { setShowHistoryForm(false); setEditingHistory(null); }} onSave={saveHistory} />}

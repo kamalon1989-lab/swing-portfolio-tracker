@@ -1,6 +1,6 @@
 import type { HoldingItem, JournalItem, WatchItem } from '@/lib/firebase';
 
-export type Tab = 'portfolio' | 'assets' | 'watchlist' | 'journal';
+export type Tab = 'portfolio' | 'assets' | 'watchlist' | 'journal' | 'paper';
 export type PriceSession = 'pre' | 'regular' | 'post' | 'closed';
 export type Price = {
   price: number;
@@ -43,6 +43,30 @@ export type SharePayload = {
   pnl: number;
   rows: Array<{ t: string; n?: string; pnl: number; w: number }>;
 };
+export type PaperAccount = {
+  id: string;
+  name: string;
+  owner?: string;
+  initialCash: number;
+  createdAt: string;
+  note?: string;
+};
+export type PaperTrade = {
+  id: string;
+  accountId: string;
+  date: string;
+  action: 'buy' | 'sell';
+  ticker: string;
+  shares: number;
+  price: number;
+  fee?: number;
+  strategy?: string;
+  thesis?: string;
+  risk?: string;
+  scenario?: string;
+  review?: string;
+  note?: string;
+};
 
 export type InvestStyle = '공격형' | '중립형' | '보수형' | '자유형';
 
@@ -67,6 +91,8 @@ export const K = {
   memos: 'ptf_memos',
   goal: 'ptf_goal',
   extendedHours: 'ptf_ext_hours',
+  paperAccounts: 'ptf_paper_accounts',
+  paperTrades: 'ptf_paper_trades',
 };
 
 export const demoHoldings: HoldingItem[] = [

@@ -148,12 +148,13 @@ const chartColors = ['#2563eb', '#16a34a', '#dc2626', '#7c3aed', '#f59e0b', '#08
 
 export function MobileTabs({ tab, setTab }: { tab: Tab; setTab: (tab: Tab) => void }) {
   return (
-    <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-4 gap-1 rounded-2xl border border-border bg-card/95 p-1.5 shadow-2xl backdrop-blur sm:hidden mobile-bottom-nav">
+    <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 gap-1 rounded-2xl border border-border bg-card/95 p-1.5 shadow-2xl backdrop-blur sm:hidden mobile-bottom-nav">
       {([
         ['portfolio', '포트폴리오'],
         ['assets', '자산'],
         ['watchlist', '관심'],
         ['journal', '일지'],
+        ['paper', '모의'],
       ] as const).map(([key, label]) => (
         <button key={key} onClick={() => setTab(key)} className={`rounded-xl px-2 py-2.5 text-xs font-bold ${tab === key ? 'bg-brand text-white shadow-sm' : 'text-sub'}`}>
           {label}

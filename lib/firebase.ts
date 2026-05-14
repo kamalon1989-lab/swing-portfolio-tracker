@@ -52,6 +52,8 @@ export interface LegacyPortfolio {
   c?: number;             // cash
   m?: Record<string, string>; // ticker memos
   xh?: boolean;            // use extended-hours prices
+  pa?: PaperAccount[];      // paper trading accounts
+  pt?: PaperTrade[];        // paper trading trades
   g?: {
     targetAmount: number;
     targetDate: string;
@@ -92,6 +94,32 @@ export interface JournalItem {
   fee?: number;
   note?: string;
   strategy?: string;
+}
+
+export interface PaperAccount {
+  id: string;
+  name: string;
+  owner?: string;
+  initialCash: number;
+  createdAt: string;
+  note?: string;
+}
+
+export interface PaperTrade {
+  id: string;
+  accountId: string;
+  date: string;
+  action: 'buy' | 'sell';
+  ticker: string;
+  shares: number;
+  price: number;
+  fee?: number;
+  strategy?: string;
+  thesis?: string;
+  risk?: string;
+  scenario?: string;
+  review?: string;
+  note?: string;
 }
 
 export interface HistoryEntry {

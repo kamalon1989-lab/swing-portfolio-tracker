@@ -30,6 +30,8 @@ import {
   type EarningsItem,
   type GoalConfig,
   type HistoryEntry,
+  type PaperAccount,
+  type PaperTrade,
   type Price,
   type PriceMap,
   type SharePayload,
@@ -74,6 +76,13 @@ export function usePortfolioApp() {
   const [benchData, setBenchData] = useState<{ date: string; price: number }[]>([]);
   const [goalConfig, setGoalConfig] = useState<GoalConfig | null>(null);
   const [showGoalForm, setShowGoalForm] = useState(false);
+  const [paperAccounts, setPaperAccounts] = useState<PaperAccount[]>([]);
+  const [paperTrades, setPaperTrades] = useState<PaperTrade[]>([]);
+  const [selectedPaperAccountId, setSelectedPaperAccountId] = useState('');
+  const [editingPaperAccount, setEditingPaperAccount] = useState<PaperAccount | null>(null);
+  const [editingPaperTrade, setEditingPaperTrade] = useState<PaperTrade | null>(null);
+  const [showPaperAccountForm, setShowPaperAccountForm] = useState(false);
+  const [showPaperTradeForm, setShowPaperTradeForm] = useState(false);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cloudLoaded = useRef(false);
 
@@ -117,6 +126,11 @@ export function usePortfolioApp() {
     setWatch(localWatch);
     setJournal(readJson<JournalItem[]>(K.journal, []));
     setHistory(readJson<HistoryEntry[]>(K.history, []));
+    const localPaperAccounts = readJson<PaperAccount[]>(K.paperAccounts, []);
+    const localPaperTrades = readJson<PaperTrade[]>(K.paperTrades, []);
+    setPaperAccounts(localPaperAccounts);
+    setPaperTrades(localPaperTrades);
+    setSelectedPaperAccountId(localPaperAccounts[0]?.id ?? '');
     setCash(readJson<number>(K.cash, 0));
     setPrices(readJson<PriceMap>(K.prices, {}));
     setKrw(readJson<boolean>(K.krw, false));
@@ -142,6 +156,11 @@ export function usePortfolioApp() {
           setWatch(loadedWatch);
           setJournal(data.j ?? []);
           setHistory(normalizeHistory(data.hi));
+          const loadedPaperAccounts = data.pa ?? [];
+          const loadedPaperTrades = data.pt ?? [];
+          setPaperAccounts(loadedPaperAccounts);
+          setPaperTrades(loadedPaperTrades);
+          setSelectedPaperAccountId((current) => current || loadedPaperAccounts[0]?.id || '');
           setCash(data.c ?? 0);
           setUseExtendedHours(data.xh ?? readJson<boolean>(K.extendedHours, true));
           const loadedGoal = data.g ?? localGoal ?? null;
@@ -155,6 +174,8 @@ export function usePortfolioApp() {
           writeJson(K.watch, data.w ?? []);
           writeJson(K.journal, data.j ?? []);
           writeJson(K.history, data.hi ?? []);
+          writeJson(K.paperAccounts, loadedPaperAccounts);
+          writeJson(K.paperTrades, loadedPaperTrades);
           writeJson(K.cash, data.c ?? 0);
           writeJson(K.memos, mergedMemos);
           writeJson(K.extendedHours, data.xh ?? readJson<boolean>(K.extendedHours, true));
@@ -201,13 +222,15 @@ export function usePortfolioApp() {
     writeJson(K.watch, watch);
     writeJson(K.journal, journal);
     writeJson(K.history, history);
+    writeJson(K.paperAccounts, paperAccounts);
+    writeJson(K.paperTrades, paperTrades);
     writeJson(K.cash, cash);
     writeJson(K.prices, prices);
     writeJson(K.krw, krw);
     writeJson(K.extendedHours, useExtendedHours);
     writeJson(K.memos, tickerMemos);
     writeJson(K.goal, goalConfig);
-  }, [ready, demo, holdings, watch, journal, history, cash, prices, krw, useExtendedHours, tickerMemos, goalConfig]);
+  }, [ready, demo, holdings, watch, journal, history, paperAccounts, paperTrades, cash, prices, krw, useExtendedHours, tickerMemos, goalConfig]);
 
   useEffect(() => {
     if (!pdfPayload) return;
@@ -226,6 +249,8 @@ export function usePortfolioApp() {
           w: watch,
           j: journal,
           hi: history,
+          pa: paperAccounts,
+          pt: paperTrades,
           c: cash,
           m: tickerMemos,
           xh: useExtendedHours,
@@ -236,7 +261,7 @@ export function usePortfolioApp() {
         setStatus('Firebase 동기화 실패');
       }
     }, 1200);
-  }, [user, demo, holdings, watch, journal, history, cash, tickerMemos, useExtendedHours, goalConfig]);
+  }, [user, demo, holdings, watch, journal, history, paperAccounts, paperTrades, cash, tickerMemos, useExtendedHours, goalConfig]);
 
   const rows = useMemo(() => {
     let totalValue = 0;
@@ -290,6 +315,10 @@ export function usePortfolioApp() {
     rows: rows.map((r) => ({ t: r.ticker, n: r.name, pnl: r.pnlPct, w: r.weight })),
   }), [rows, summary.totalPnlPct]);
 
+  const paperSnapshots = useMemo(() => {
+    return paperAccounts.map((account) => buildPaperSnapshot(account, paperTrades.filter((trade) => trade.accountId === account.id), prices));
+  }, [paperAccounts, paperTrades, prices]);
+
   async function refreshPrices() {
     if (demo) {
       setPrices(demoPrices);
@@ -301,7 +330,8 @@ export function usePortfolioApp() {
       notify('시세 조회는 로그인 후 사용할 수 있습니다');
       return;
     }
-    const tickers = Array.from(new Set([...holdings.map((h) => h.ticker), ...watch.map((w) => w.ticker)])).filter(Boolean);
+    const paperTickers = paperTrades.map((trade) => trade.ticker);
+    const tickers = Array.from(new Set([...holdings.map((h) => h.ticker), ...watch.map((w) => w.ticker), ...paperTickers])).filter(Boolean);
     if (!tickers.length) return;
     setLoadingPrices(true);
     try {
@@ -761,6 +791,148 @@ export function usePortfolioApp() {
     notify('투자 목표를 저장했습니다');
   }
 
+  function savePaperAccount(item: PaperAccount) {
+    const name = item.name.trim();
+    if (!name || !item.initialCash) {
+      notify('계좌명과 시작 현금은 필수입니다');
+      return;
+    }
+    const account = { ...item, id: item.id || uid(), name, createdAt: item.createdAt || today() };
+    setPaperAccounts((prev) => {
+      const next = editingPaperAccount ? prev.map((x) => (x.id === editingPaperAccount.id ? account : x)) : [...prev, account];
+      if (!selectedPaperAccountId) setSelectedPaperAccountId(account.id);
+      return next;
+    });
+    setEditingPaperAccount(null);
+    setShowPaperAccountForm(false);
+  }
+
+  function deletePaperAccount(id: string) {
+    setPaperAccounts((prev) => prev.filter((item) => item.id !== id));
+    setPaperTrades((prev) => prev.filter((item) => item.accountId !== id));
+    setSelectedPaperAccountId((current) => current === id ? paperAccounts.find((item) => item.id !== id)?.id ?? '' : current);
+  }
+
+  function savePaperTrade(item: PaperTrade) {
+    const trade = { ...item, ticker: normalizeTicker(item.ticker), id: item.id || uid() };
+    if (!trade.accountId || !trade.ticker || !trade.shares || !trade.price) {
+      notify('계좌, 티커, 수량, 단가는 필수입니다');
+      return;
+    }
+    setPaperTrades((prev) => (editingPaperTrade ? prev.map((x) => (x.id === editingPaperTrade.id ? trade : x)) : [trade, ...prev]));
+    setSelectedPaperAccountId(trade.accountId);
+    setEditingPaperTrade(null);
+    setShowPaperTradeForm(false);
+  }
+
+  function deletePaperTrade(id: string) {
+    setPaperTrades((prev) => prev.filter((item) => item.id !== id));
+  }
+
+  function exportPaperTrading() {
+    const payload = {
+      schemaVersion: '1.0',
+      exportPurpose: 'paper_trading',
+      exportedAt: new Date().toISOString(),
+      accounts: paperAccounts,
+      trades: paperTrades,
+      snapshots: paperSnapshots,
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `paper_trading_export_${fileTimestamp()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    notify('모의투자 JSON을 저장했습니다');
+  }
+
+  async function importPaperTrading(file: File) {
+    try {
+      const data = JSON.parse(await file.text()) as { accounts?: PaperAccount[]; trades?: PaperTrade[] };
+      if (!Array.isArray(data.accounts) || !Array.isArray(data.trades)) throw new Error('모의투자 JSON 형식이 아닙니다');
+      setPaperAccounts(data.accounts);
+      setPaperTrades(data.trades);
+      setSelectedPaperAccountId(data.accounts[0]?.id ?? '');
+      notify('모의투자 데이터를 불러왔습니다');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : '모의투자 가져오기에 실패했습니다');
+    }
+  }
+
+  function buildPaperSnapshot(account: PaperAccount, tradesForAccount: PaperTrade[], quoteMap: PriceMap) {
+    const positions: Record<string, { ticker: string; shares: number; cost: number }> = {};
+    let cash = account.initialCash;
+    let realizedPnl = 0;
+    const sorted = [...tradesForAccount].sort((a, b) => a.date.localeCompare(b.date));
+    for (const trade of sorted) {
+      const fee = trade.fee ?? 0;
+      const amount = trade.shares * trade.price;
+      if (trade.action === 'buy') {
+        cash -= amount + fee;
+        const current = positions[trade.ticker] ?? { ticker: trade.ticker, shares: 0, cost: 0 };
+        current.shares += trade.shares;
+        current.cost += amount;
+        positions[trade.ticker] = current;
+      } else {
+        cash += amount - fee;
+        const current = positions[trade.ticker];
+        const avgCost = current?.shares ? current.cost / current.shares : trade.price;
+        realizedPnl += (trade.price - avgCost) * trade.shares - fee;
+        if (current) {
+          current.shares -= trade.shares;
+          current.cost = Math.max(0, current.cost - avgCost * trade.shares);
+          if (current.shares <= 0.000001) delete positions[trade.ticker];
+        }
+      }
+    }
+    const rawHoldings = Object.values(positions).map((position) => {
+      const quote = quoteMap[position.ticker];
+      const avgCost = position.shares ? position.cost / position.shares : 0;
+      const price = quote?.price ?? avgCost;
+      const value = price * position.shares;
+      const pnl = value - position.cost;
+      return {
+        ticker: position.ticker,
+        shares: position.shares,
+        avgCost,
+        price,
+        value,
+        cost: position.cost,
+        pnl,
+        pnlPct: position.cost ? (pnl / position.cost) * 100 : 0,
+        dayPct: quote?.changePercent ?? 0,
+        priceSession: quote?.session,
+        priceSource: quote?.source,
+      };
+    }).sort((a, b) => b.value - a.value);
+    const stockValue = rawHoldings.reduce((sum, item) => sum + item.value, 0);
+    const totalAsset = cash + stockValue;
+    const holdingsWithWeight = rawHoldings.map((item) => ({
+      ...item,
+      weight: stockValue ? (item.value / stockValue) * 100 : 0,
+      totalWeight: totalAsset ? (item.value / totalAsset) * 100 : 0,
+    }));
+    const totalCost = holdingsWithWeight.reduce((sum, item) => sum + item.cost, 0);
+    const unrealizedPnl = holdingsWithWeight.reduce((sum, item) => sum + item.pnl, 0);
+    return {
+      account,
+      holdings: holdingsWithWeight,
+      trades: [...tradesForAccount].sort((a, b) => b.date.localeCompare(a.date)),
+      summary: {
+        cash,
+        stockValue,
+        totalAsset,
+        totalCost,
+        unrealizedPnl,
+        realizedPnl,
+        totalPnl: realizedPnl + unrealizedPnl,
+        totalPnlPct: account.initialCash ? ((totalAsset - account.initialCash) / account.initialCash) * 100 : 0,
+        tradeCount: tradesForAccount.length,
+      },
+    };
+  }
+
   async function refreshBenchmark() {
     const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date));
     if (sorted.length < 2) return;
@@ -842,6 +1014,25 @@ export function usePortfolioApp() {
     showGoalForm,
     setShowGoalForm,
     saveGoal,
+    paperAccounts,
+    paperTrades,
+    paperSnapshots,
+    selectedPaperAccountId,
+    setSelectedPaperAccountId,
+    editingPaperAccount,
+    setEditingPaperAccount,
+    editingPaperTrade,
+    setEditingPaperTrade,
+    showPaperAccountForm,
+    setShowPaperAccountForm,
+    showPaperTradeForm,
+    setShowPaperTradeForm,
+    savePaperAccount,
+    deletePaperAccount,
+    savePaperTrade,
+    deletePaperTrade,
+    exportPaperTrading,
+    importPaperTrading,
     pdfPayload,
     setPdfPayload,
     rows,

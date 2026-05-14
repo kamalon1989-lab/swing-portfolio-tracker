@@ -25,6 +25,8 @@ import {
   pct,
   usd,
   type EarningsItem,
+  type PaperAccount,
+  type PaperTrade,
   type Price,
   type PriceMap,
   type PriceSession,
@@ -50,6 +52,36 @@ type SortKey = 'ticker' | 'price' | 'shares' | 'avgCost' | 'value' | 'pnl' | 'pn
 type SortDir = 'asc' | 'desc';
 type AlertLevel = 'danger' | 'warning' | 'success';
 type PriceAlert = { ticker: string; label: string; message: string; level: AlertLevel };
+type PaperSnapshot = {
+  account: PaperAccount;
+  holdings: Array<{
+    ticker: string;
+    shares: number;
+    avgCost: number;
+    price: number;
+    value: number;
+    cost: number;
+    pnl: number;
+    pnlPct: number;
+    dayPct: number;
+    weight: number;
+    totalWeight: number;
+    priceSession?: PriceSession;
+    priceSource?: Price['source'];
+  }>;
+  trades: PaperTrade[];
+  summary: {
+    cash: number;
+    stockValue: number;
+    totalAsset: number;
+    totalCost: number;
+    unrealizedPnl: number;
+    realizedPnl: number;
+    totalPnl: number;
+    totalPnlPct: number;
+    tradeCount: number;
+  };
+};
 
 function compactUsd(value: number) {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -815,6 +847,195 @@ export function JournalView({ journal, onAdd, onEdit, onDelete }: { journal: Jou
         {!journal.length && <div className="p-12 text-center text-sm text-sub">거래 기록이 없습니다.</div>}
       </div>
     </section>
+  );
+}
+
+export function PaperTradingView({
+  accounts,
+  snapshots,
+  selectedAccountId,
+  onSelectAccount,
+  onAddAccount,
+  onEditAccount,
+  onDeleteAccount,
+  onAddTrade,
+  onEditTrade,
+  onDeleteTrade,
+  onExport,
+  onImport,
+}: {
+  accounts: PaperAccount[];
+  snapshots: PaperSnapshot[];
+  selectedAccountId: string;
+  onSelectAccount: (id: string) => void;
+  onAddAccount: () => void;
+  onEditAccount: (item: PaperAccount) => void;
+  onDeleteAccount: (id: string) => void;
+  onAddTrade: () => void;
+  onEditTrade: (item: PaperTrade) => void;
+  onDeleteTrade: (id: string) => void;
+  onExport: () => void;
+  onImport: (file: File) => void;
+}) {
+  const [importKey, setImportKey] = useState(0);
+  const selected = snapshots.find((item) => item.account.id === selectedAccountId) ?? snapshots[0];
+  const ranking = [...snapshots].sort((a, b) => b.summary.totalPnlPct - a.summary.totalPnlPct);
+
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        <button onClick={onAddAccount} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">계좌 추가</button>
+        <button onClick={onAddTrade} disabled={!accounts.length} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-40">거래 추가</button>
+        <button onClick={onExport} disabled={!accounts.length} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-40">모의 내보내기</button>
+        <label className="cursor-pointer rounded-lg border border-border px-3 py-2 text-sm font-bold">
+          모의 가져오기
+          <input
+            key={importKey}
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onImport(file);
+              setImportKey((v) => v + 1);
+            }}
+          />
+        </label>
+      </div>
+
+      {!accounts.length ? (
+        <div className="rounded-2xl border border-border bg-card p-8 text-center">
+          <h2 className="text-lg font-bold">모의투자 계좌가 없습니다</h2>
+          <p className="mt-2 text-sm text-sub">내 모의계좌나 GPT 계좌를 만들어서 실계좌와 분리된 투자 기록을 시작하세요.</p>
+          <button onClick={onAddAccount} className="mt-4 rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white">첫 계좌 만들기</button>
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-bold uppercase text-sky-300">Paper Trading</div>
+                  <h2 className="mt-1 text-xl font-extrabold text-slate-100">{selected?.account.name}</h2>
+                  <p className="mt-1 text-xs text-slate-400">{selected?.account.owner || '소유자 미지정'} · 시작일 {selected?.account.createdAt}</p>
+                </div>
+                {selected && (
+                  <div className={`rounded-full border px-3 py-1 text-xs font-bold ${selected.summary.totalPnl >= 0 ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200' : 'border-rose-400/30 bg-rose-400/10 text-rose-200'}`}>
+                    {pct(selected.summary.totalPnlPct)}
+                  </div>
+                )}
+              </div>
+              {selected && (
+                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                  <PaperMetric label="총자산" value={usd(selected.summary.totalAsset)} />
+                  <PaperMetric label="현금" value={usd(selected.summary.cash)} />
+                  <PaperMetric label="평가금액" value={usd(selected.summary.stockValue)} />
+                  <PaperMetric label="총손익" value={usd(selected.summary.totalPnl)} color={colorClass(selected.summary.totalPnl)} />
+                  <PaperMetric label="실현손익" value={usd(selected.summary.realizedPnl)} color={colorClass(selected.summary.realizedPnl)} />
+                  <PaperMetric label="미실현손익" value={usd(selected.summary.unrealizedPnl)} color={colorClass(selected.summary.unrealizedPnl)} />
+                  <PaperMetric label="거래 수" value={`${selected.summary.tradeCount}건`} />
+                  <PaperMetric label="시작 현금" value={usd(selected.account.initialCash)} />
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-bold">계좌 랭킹</h3>
+                <span className="text-xs text-sub">{accounts.length}개</span>
+              </div>
+              <div className="space-y-2">
+                {ranking.map((item, index) => (
+                  <button key={item.account.id} onClick={() => onSelectAccount(item.account.id)} className={`w-full rounded-xl border p-3 text-left ${selected?.account.id === item.account.id ? 'border-brand bg-brand/5' : 'border-border bg-bg'}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-sub">#{index + 1}</div>
+                        <div className="truncate font-bold">{item.account.name}</div>
+                      </div>
+                      <div className={`text-right font-extrabold ${colorClass(item.summary.totalPnlPct)}`}>{pct(item.summary.totalPnlPct)}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {accounts.map((account) => (
+              <button key={account.id} onClick={() => onSelectAccount(account.id)} className={`rounded-full border px-3 py-1.5 text-sm font-bold ${selected?.account.id === account.id ? 'border-brand bg-brand text-white' : 'border-border text-sub'}`}>
+                {account.name}
+              </button>
+            ))}
+            {selected && <button onClick={() => onEditAccount(selected.account)} className="rounded-full border border-border px-3 py-1.5 text-sm font-bold text-brand">계좌 수정</button>}
+            {selected && <button onClick={() => onDeleteAccount(selected.account.id)} className="rounded-full border border-rose-200 px-3 py-1.5 text-sm font-bold text-rose-600">계좌 삭제</button>}
+          </div>
+
+          {selected && (
+            <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
+              <div className="overflow-x-auto rounded-xl border border-border bg-card">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead className="bg-bg text-xs text-sub">
+                    <tr><th className="px-3 py-3 text-left">티커</th><th className="px-3 py-3 text-right">현재가</th><th className="px-3 py-3 text-right">수량</th><th className="px-3 py-3 text-right">평단</th><th className="px-3 py-3 text-right">평가금액</th><th className="px-3 py-3 text-right">손익</th><th className="px-3 py-3 text-right">비중</th></tr>
+                  </thead>
+                  <tbody>
+                    {selected.holdings.map((row) => (
+                      <tr key={row.ticker} className="border-t border-border">
+                        <td className="px-3 py-3 font-bold text-brand">{row.ticker}</td>
+                        <td className="px-3 py-3 text-right">{usd(row.price)}</td>
+                        <td className="px-3 py-3 text-right">{row.shares.toFixed(4).replace(/\.?0+$/, '')}</td>
+                        <td className="px-3 py-3 text-right">{usd(row.avgCost)}</td>
+                        <td className="px-3 py-3 text-right font-semibold">{usd(row.value)}</td>
+                        <td className={`px-3 py-3 text-right font-semibold ${colorClass(row.pnl)}`}>{usd(row.pnl)}<div className="text-xs">{pct(row.pnlPct)}</div></td>
+                        <td className="px-3 py-3 text-right">{row.weight.toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!selected.holdings.length && <div className="p-10 text-center text-sm text-sub">보유 중인 모의 종목이 없습니다.</div>}
+              </div>
+
+              <div className="rounded-xl border border-border bg-card p-4">
+                <h3 className="font-bold">거래/복기 기록</h3>
+                <div className="mt-3 max-h-[520px] space-y-3 overflow-y-auto pr-1">
+                  {selected.trades.map((trade) => (
+                    <div key={trade.id} className="rounded-xl border border-border bg-bg p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-xs text-sub">{trade.date}</div>
+                          <div className="mt-1 flex items-center gap-2">
+                            <strong>{trade.ticker}</strong>
+                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${trade.action === 'buy' ? 'bg-blue-50 text-blue-700' : 'bg-rose-50 text-rose-700'}`}>{trade.action === 'buy' ? '매수' : '매도'}</span>
+                          </div>
+                        </div>
+                        <div className={`text-right font-bold ${trade.action === 'buy' ? 'text-blue-600' : 'text-rose-600'}`}>{usd(trade.shares * trade.price)}</div>
+                      </div>
+                      <div className="mt-2 text-xs text-sub">수량 {trade.shares} · 단가 {usd(trade.price)} · {trade.strategy || '전략 없음'}</div>
+                      {trade.thesis && <p className="mt-2 text-xs leading-5 text-sub">근거: {trade.thesis}</p>}
+                      {trade.risk && <p className="mt-1 text-xs leading-5 text-sub">리스크: {trade.risk}</p>}
+                      {trade.review && <p className="mt-1 text-xs leading-5 text-sub">복기: {trade.review}</p>}
+                      <div className="mt-2 flex justify-end gap-2">
+                        <button onClick={() => onEditTrade(trade)} className="rounded-md border border-border px-2 py-1 text-xs font-bold text-brand">수정</button>
+                        <button onClick={() => onDeleteTrade(trade.id)} className="rounded-md border border-rose-200 px-2 py-1 text-xs font-bold text-rose-600">삭제</button>
+                      </div>
+                    </div>
+                  ))}
+                  {!selected.trades.length && <div className="rounded-xl bg-bg p-8 text-center text-sm text-sub">모의 거래 기록이 없습니다.</div>}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function PaperMetric({ label, value, color = 'text-slate-100' }: { label: string; value: string; color?: string }) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+      <div className="text-xs font-semibold text-slate-400">{label}</div>
+      <div className={`mt-1 text-lg font-extrabold ${color}`}>{value}</div>
+    </div>
   );
 }
 
