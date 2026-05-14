@@ -863,6 +863,7 @@ export function PaperTradingView({
   onDeleteTrade,
   onExport,
   onImport,
+  onClonePortfolio,
 }: {
   accounts: PaperAccount[];
   snapshots: PaperSnapshot[];
@@ -876,10 +877,56 @@ export function PaperTradingView({
   onDeleteTrade: (id: string) => void;
   onExport: () => void;
   onImport: (file: File) => void;
+  onClonePortfolio: () => void;
 }) {
   const [importKey, setImportKey] = useState(0);
+  const [showPrompt, setShowPrompt] = useState(false);
   const selected = snapshots.find((item) => item.account.id === selectedAccountId) ?? snapshots[0];
   const ranking = [...snapshots].sort((a, b) => b.summary.totalPnlPct - a.summary.totalPnlPct);
+  const importPrompt = `아래 JSON 스키마에 맞춰 모의투자 데이터를 만들어줘. 실제 포트폴리오 AI export와 섞지 말고, 모의투자 전용으로만 작성해줘.
+
+필수 규칙:
+- schemaVersion은 "1.0"
+- exportPurpose는 "paper_trading"
+- accounts 배열에는 계좌 id, name, owner, initialCash, createdAt을 넣어줘
+- trades 배열의 accountId는 accounts의 id와 반드시 일치해야 해
+- action은 "buy" 또는 "sell"만 사용해
+- ticker는 대문자로 써줘
+- fee는 달러 기준 실제 수수료 금액이야
+
+예시:
+{
+  "schemaVersion": "1.0",
+  "exportPurpose": "paper_trading",
+  "accounts": [
+    {
+      "id": "gpt-account",
+      "name": "GPT 계좌",
+      "owner": "GPT",
+      "initialCash": 100000,
+      "createdAt": "2026-05-14",
+      "note": "GPT와 투자내기용 모의계좌"
+    }
+  ],
+  "trades": [
+    {
+      "id": "gpt-trade-1",
+      "accountId": "gpt-account",
+      "date": "2026-05-14",
+      "action": "buy",
+      "ticker": "NVDA",
+      "shares": 5,
+      "price": 920.5,
+      "fee": 11.51,
+      "strategy": "earnings momentum",
+      "thesis": "실적 기대와 AI 인프라 수요 지속",
+      "risk": "실적 발표 후 차익실현 가능성",
+      "scenario": "목표 구간까지 분할 매도",
+      "review": "",
+      "note": "GPT 추천 매수"
+    }
+  ]
+}`;
 
   return (
     <section className="space-y-4">
@@ -887,6 +934,8 @@ export function PaperTradingView({
         <button onClick={onAddAccount} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">계좌 추가</button>
         <button onClick={onAddTrade} disabled={!accounts.length} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-40">거래 추가</button>
         <button onClick={onExport} disabled={!accounts.length} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-40">모의 내보내기</button>
+        <button onClick={onClonePortfolio} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">현재 포트폴리오 복사</button>
+        <button onClick={() => setShowPrompt((v) => !v)} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">AI 입력 예시</button>
         <label className="cursor-pointer rounded-lg border border-border px-3 py-2 text-sm font-bold">
           모의 가져오기
           <input
@@ -902,6 +951,25 @@ export function PaperTradingView({
           />
         </label>
       </div>
+
+      {showPrompt && (
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="font-bold">AI에게 줄 모의투자 JSON 작성 프롬프트</h3>
+              <p className="mt-1 text-xs text-sub">GPT에게 이 형식으로 작성하게 한 뒤, 결과 JSON 파일을 모의 가져오기로 불러오면 됩니다.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard?.writeText(importPrompt)}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-bold text-brand"
+            >
+              복사
+            </button>
+          </div>
+          <pre className="mt-3 max-h-80 overflow-auto rounded-xl bg-slate-950 p-4 text-xs leading-5 text-slate-100">{importPrompt}</pre>
+        </div>
+      )}
 
       {!accounts.length ? (
         <div className="rounded-2xl border border-border bg-card p-8 text-center">

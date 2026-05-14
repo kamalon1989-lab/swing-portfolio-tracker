@@ -860,6 +860,40 @@ export function usePortfolioApp() {
     }
   }
 
+  function cloneCurrentPortfolioToPaper() {
+    if (!rows.length) {
+      notify('복사할 보유 티커가 없습니다');
+      return;
+    }
+    const accountId = uid();
+    const account: PaperAccount = {
+      id: accountId,
+      name: `현재 포트폴리오 복사 ${today()}`,
+      owner: 'me',
+      initialCash: roundNumber(summary.totalCost + cash),
+      createdAt: today(),
+      note: '실계좌 현재 보유 상태를 모의투자 시작점으로 복사',
+    };
+    const trades: PaperTrade[] = rows.map((row) => ({
+      id: uid(),
+      accountId,
+      date: row.buyDate ?? row.lastBuyDate ?? today(),
+      action: 'buy',
+      ticker: row.ticker,
+      shares: row.shares,
+      price: row.avgCost,
+      fee: 0,
+      strategy: 'current-portfolio-import',
+      thesis: '실계좌 현재 보유 상태에서 생성',
+      note: row.note ?? tickerMemos[row.ticker] ?? '',
+    }));
+    setPaperAccounts((prev) => [...prev, account]);
+    setPaperTrades((prev) => [...trades, ...prev]);
+    setSelectedPaperAccountId(accountId);
+    setTab('paper');
+    notify('현재 포트폴리오를 모의계좌로 복사했습니다');
+  }
+
   function buildPaperSnapshot(account: PaperAccount, tradesForAccount: PaperTrade[], quoteMap: PriceMap) {
     const positions: Record<string, { ticker: string; shares: number; cost: number }> = {};
     let cash = account.initialCash;
@@ -1033,6 +1067,7 @@ export function usePortfolioApp() {
     deletePaperTrade,
     exportPaperTrading,
     importPaperTrading,
+    cloneCurrentPortfolioToPaper,
     pdfPayload,
     setPdfPayload,
     rows,

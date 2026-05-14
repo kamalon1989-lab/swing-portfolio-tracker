@@ -143,6 +143,7 @@ export default function OpenPage() {
     deletePaperTrade,
     exportPaperTrading,
     importPaperTrading,
+    cloneCurrentPortfolioToPaper,
   } = app;
 
   if (!ready) return <main className="min-h-screen grid place-items-center text-slate-500">불러오는 중...</main>;
@@ -322,6 +323,7 @@ export default function OpenPage() {
               onDeleteTrade={deletePaperTrade}
               onExport={exportPaperTrading}
               onImport={importPaperTrading}
+              onClonePortfolio={cloneCurrentPortfolioToPaper}
             />
           )}
         </div>
