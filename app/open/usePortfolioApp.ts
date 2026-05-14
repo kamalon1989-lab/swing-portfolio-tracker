@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
@@ -108,7 +108,7 @@ export function usePortfolioApp() {
       setJournal(demoJournal);
       setCash(8500);
       setPrices(demoPrices);
-      setStatus('데모 가상 시세');
+      setStatus('?곕え 媛???쒖꽭');
       setReady(true);
       cloudLoaded.current = true;
       return;
@@ -118,7 +118,7 @@ export function usePortfolioApp() {
     const localWatch = readJson<WatchItem[]>(K.watch, []);
     const localMemos = readJson<Record<string, string>>(K.memos, {});
     const localGoal = readJson<GoalConfig | null>(K.goal, null);
-    // holding.note / watch.note → tickerMemos 흡수 (tickerMemos에 값이 없는 경우만)
+    // holding.note / watch.note ??tickerMemos ?≪닔 (tickerMemos??媛믪씠 ?녿뒗 寃쎌슦留?
     const seedMemos = { ...localMemos };
     localHoldings.forEach((h) => { if (h.note && !seedMemos[h.ticker]) seedMemos[h.ticker] = h.note; });
     localWatch.forEach((w) => { if (w.note && !seedMemos[w.ticker]) seedMemos[w.ticker] = w.note; });
@@ -165,7 +165,7 @@ export function usePortfolioApp() {
           setUseExtendedHours(data.xh ?? readJson<boolean>(K.extendedHours, true));
           const loadedGoal = data.g ?? localGoal ?? null;
           setGoalConfig(loadedGoal);
-          // holding.note / watch.note → tickerMemos 흡수 (tickerMemos에 값이 없는 경우만)
+          // holding.note / watch.note ??tickerMemos ?≪닔 (tickerMemos??媛믪씠 ?녿뒗 寃쎌슦留?
           const mergedMemos: Record<string, string> = { ...(data.m ?? {}) };
           loadedHoldings.forEach((h) => { if (h.note && !mergedMemos[h.ticker]) mergedMemos[h.ticker] = h.note; });
           loadedWatch.forEach((w) => { if (w.note && !mergedMemos[w.ticker]) mergedMemos[w.ticker] = w.note; });
@@ -256,9 +256,9 @@ export function usePortfolioApp() {
           xh: useExtendedHours,
           g: goalConfig,
         });
-        setStatus('Firebase 동기화 완료');
+        setStatus('Firebase ?숆린???꾨즺');
       } catch {
-        setStatus('Firebase 동기화 실패');
+        setStatus('Firebase ?숆린???ㅽ뙣');
       }
     }, 1200);
   }, [user, demo, holdings, watch, journal, history, paperAccounts, paperTrades, cash, tickerMemos, useExtendedHours, goalConfig]);
@@ -322,12 +322,12 @@ export function usePortfolioApp() {
   async function refreshPrices() {
     if (demo) {
       setPrices(demoPrices);
-      setStatus('데모 가상 시세');
+      setStatus('?곕え 媛???쒖꽭');
       return;
     }
     const current = getFirebaseAuth().currentUser;
     if (!current) {
-      notify('시세 조회는 로그인 후 사용할 수 있습니다');
+      notify('?쒖꽭 議고쉶??濡쒓렇?????ъ슜?????덉뒿?덈떎');
       return;
     }
     const paperTickers = paperTrades.map((trade) => trade.ticker);
@@ -373,9 +373,9 @@ export function usePortfolioApp() {
         }
       }
       setPrices(next);
-      setStatus(`${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 시세 갱신`);
+      setStatus(`${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} ?쒖꽭 媛깆떊`);
     } catch {
-      setStatus('시세 조회 실패');
+      setStatus('?쒖꽭 議고쉶 ?ㅽ뙣');
     } finally {
       setLoadingPrices(false);
     }
@@ -486,7 +486,7 @@ export function usePortfolioApp() {
       }
       return [...prev, entry];
     });
-    // 종목 폼의 note도 tickerMemos에 동기화
+    // 醫낅ぉ ?쇱쓽 note??tickerMemos???숆린??
     if (item.note !== undefined) {
       setTickerMemos((prev) => ({ ...prev, [ticker]: item.note ?? prev[ticker] ?? '' }));
     }
@@ -497,19 +497,19 @@ export function usePortfolioApp() {
   function saveWatch(item: WatchItem) {
     const ticker = normalizeTicker(item.ticker);
     if (!ticker) {
-      notify('티커를 입력해주세요');
+      notify('?곗빱瑜??낅젰?댁＜?몄슂');
       return;
     }
     setWatch((prev) => {
       const entry = { ...item, ticker };
       if (editingWatch) return prev.map((x) => (x.ticker === editingWatch.ticker ? entry : x));
       if (prev.some((x) => x.ticker === ticker)) {
-        notify('이미 관심 종목에 있습니다');
+        notify('?대? 愿??醫낅ぉ???덉뒿?덈떎');
         return prev;
       }
       return [...prev, entry];
     });
-    // 관심 종목 note → tickerMemos 동기화
+    // 愿??醫낅ぉ note ??tickerMemos ?숆린??
     if (item.note !== undefined) {
       setTickerMemos((prev) => ({ ...prev, [ticker]: item.note ?? prev[ticker] ?? '' }));
     }
@@ -571,12 +571,12 @@ export function usePortfolioApp() {
     setHistory((prev) => [entry, ...prev.filter((x) => x.date !== entry.date)].sort((a, b) => b.date.localeCompare(a.date)));
     setShowHistoryForm(false);
     setEditingHistory(null);
-    notify('자산 기록을 수정했습니다');
+    notify('?먯궛 湲곕줉???섏젙?덉뒿?덈떎');
   }
 
   function deleteHistory(date: string) {
     setHistory((prev) => prev.filter((x) => x.date !== date));
-    notify('자산 기록을 삭제했습니다');
+    notify('?먯궛 湲곕줉????젣?덉뒿?덈떎');
   }
 
   function exportBackup() {
@@ -749,7 +749,7 @@ export function usePortfolioApp() {
       notify(url);
       return;
     }
-    navigator.clipboard.writeText(url).then(() => notify('공유 링크를 복사했습니다')).catch(() => notify(url));
+    navigator.clipboard.writeText(url).then(() => notify('怨듭쑀 留곹겕瑜?蹂듭궗?덉뒿?덈떎')).catch(() => notify(url));
   }
 
   function exportPdfReport() {
@@ -778,9 +778,9 @@ export function usePortfolioApp() {
 
   function saveTickerMemo(ticker: string, text: string) {
     setTickerMemos((prev) => ({ ...prev, [ticker]: text }));
-    // 보유 종목 note 동기화
+    // 蹂댁쑀 醫낅ぉ note ?숆린??
     setHoldings((prev) => prev.map((h) => h.ticker === ticker ? { ...h, note: text } : h));
-    // 관심 종목 note 동기화
+    // 愿??醫낅ぉ note ?숆린??
     setWatch((prev) => prev.map((w) => w.ticker === ticker ? { ...w, note: text } : w));
   }
 
@@ -829,58 +829,71 @@ export function usePortfolioApp() {
     setPaperTrades((prev) => prev.filter((item) => item.id !== id));
   }
 
-  function exportPaperTrading() {
+  function exportPaperTrading(accountId: string) {
+    const snapshot = paperSnapshots.find((item) => item.account.id === accountId);
+    if (!snapshot) {
+      notify('?대낫??紐⑥쓽怨꾩쥖瑜??좏깮?댁＜?몄슂');
+      return;
+    }
+    const safeName = snapshot.account.name.replace(/[\\/:*?"<>|]/g, '_').slice(0, 40) || 'account';
     const payload = {
       schemaVersion: '1.0',
       exportPurpose: 'paper_trading',
       exportedAt: new Date().toISOString(),
-      accounts: paperAccounts,
-      trades: paperTrades,
-      snapshots: paperSnapshots,
+      accounts: [snapshot.account],
+      trades: snapshot.trades,
+      snapshots: [snapshot],
     };
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = `paper_trading_export_${fileTimestamp()}.json`;
+    a.download = `paper_trading_${safeName}_${fileTimestamp()}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    notify('모의투자 JSON을 저장했습니다');
+    notify(`${snapshot.account.name} 모의계좌 JSON을 저장했습니다`);
   }
 
   async function importPaperTrading(file: File) {
     try {
       importPaperTradingJson(await file.text());
     } catch (error) {
-      notify(error instanceof Error ? error.message : '모의투자 가져오기에 실패했습니다');
+      notify(error instanceof Error ? error.message : '紐⑥쓽?ъ옄 媛?몄삤湲곗뿉 ?ㅽ뙣?덉뒿?덈떎');
     }
   }
 
   function importPaperTradingJson(raw: string) {
     try {
       const data = JSON.parse(raw) as { accounts?: PaperAccount[]; trades?: PaperTrade[] };
-      if (!Array.isArray(data.accounts) || !Array.isArray(data.trades)) throw new Error('모의투자 JSON 형식이 아닙니다');
-      setPaperAccounts(data.accounts);
-      setPaperTrades(data.trades);
-      setSelectedPaperAccountId(data.accounts[0]?.id ?? '');
-      notify('모의투자 데이터를 불러왔습니다');
+      if (!Array.isArray(data.accounts) || !Array.isArray(data.trades)) throw new Error('紐⑥쓽?ъ옄 JSON ?뺤떇???꾨떃?덈떎');
+      if (data.accounts.length !== 1) throw new Error('계좌별 모의투자 JSON은 accounts가 1개여야 합니다');
+      const account = data.accounts[0];
+      if (!account?.id || !account.name) throw new Error('모의계좌 id와 name이 필요합니다');
+      const trades = data.trades
+        .filter((trade) => !trade.accountId || trade.accountId === account.id)
+        .map((trade) => ({ ...trade, accountId: account.id, ticker: normalizeTicker(trade.ticker ?? '') }))
+        .filter((trade) => trade.id && trade.ticker && trade.shares && trade.price);
+      setPaperAccounts((prev) => [...prev.filter((item) => item.id !== account.id), account]);
+      setPaperTrades((prev) => [...prev.filter((item) => item.accountId !== account.id), ...trades]);
+      setSelectedPaperAccountId(account.id);
+      notify(`${account.name} 모의계좌를 불러왔습니다`);
     } catch (error) {
-      notify(error instanceof Error ? error.message : '모의투자 가져오기에 실패했습니다');
+      notify(error instanceof Error ? error.message : '紐⑥쓽?ъ옄 媛?몄삤湲곗뿉 ?ㅽ뙣?덉뒿?덈떎');
     }
   }
 
   function cloneCurrentPortfolioToPaper() {
     if (!rows.length) {
-      notify('복사할 보유 티커가 없습니다');
+      notify('蹂듭궗??蹂댁쑀 ?곗빱媛 ?놁뒿?덈떎');
       return;
     }
     const accountId = uid();
     const account: PaperAccount = {
       id: accountId,
-      name: `현재 포트폴리오 복사 ${today()}`,
+      name: `?꾩옱 ?ы듃?대━??蹂듭궗 ${today()}`,
       owner: 'me',
       initialCash: roundNumber(summary.totalCost + cash),
       createdAt: today(),
-      note: '실계좌 현재 보유 상태를 모의투자 시작점으로 복사',
+      note: '?ㅺ퀎醫??꾩옱 蹂댁쑀 ?곹깭瑜?紐⑥쓽?ъ옄 ?쒖옉?먯쑝濡?蹂듭궗',
     };
     const trades: PaperTrade[] = rows.map((row) => ({
       id: uid(),
@@ -892,14 +905,14 @@ export function usePortfolioApp() {
       price: row.avgCost,
       fee: 0,
       strategy: 'current-portfolio-import',
-      thesis: '실계좌 현재 보유 상태에서 생성',
+      thesis: '?ㅺ퀎醫??꾩옱 蹂댁쑀 ?곹깭?먯꽌 ?앹꽦',
       note: row.note ?? tickerMemos[row.ticker] ?? '',
     }));
     setPaperAccounts((prev) => [...prev, account]);
     setPaperTrades((prev) => [...trades, ...prev]);
     setSelectedPaperAccountId(accountId);
     setTab('paper');
-    notify('현재 포트폴리오를 모의계좌로 복사했습니다');
+    notify('?꾩옱 ?ы듃?대━?ㅻ? 紐⑥쓽怨꾩쥖濡?蹂듭궗?덉뒿?덈떎');
   }
 
   function buildPaperSnapshot(account: PaperAccount, tradesForAccount: PaperTrade[], quoteMap: PriceMap) {
@@ -981,7 +994,7 @@ export function usePortfolioApp() {
     const from = Math.floor(new Date(sorted[0].date + 'T00:00:00').getTime() / 1000);
     const to = Math.floor(Date.now() / 1000);
     try {
-      // Yahoo Finance 프록시 사용 (API 키 불필요, Finnhub 레이트 리밋 무관)
+      // Yahoo Finance ?꾨줉???ъ슜 (API ??遺덊븘?? Finnhub ?덉씠??由щ컠 臾닿?)
       const res = await fetch(`/api/spy-history?from=${from}&to=${to}`);
       if (!res.ok) return;
       const data = await res.json();
@@ -994,7 +1007,7 @@ export function usePortfolioApp() {
         .filter((c) => typeof c.price === 'number' && !isNaN(c.price));
       setBenchData(candles);
     } catch {
-      // 벤치마크 조회 실패는 무시
+      // 踰ㅼ튂留덊겕 議고쉶 ?ㅽ뙣??臾댁떆
     }
   }
 

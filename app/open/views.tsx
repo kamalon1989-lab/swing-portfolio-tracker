@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -876,7 +876,7 @@ export function PaperTradingView({
   onAddTrade: () => void;
   onEditTrade: (item: PaperTrade) => void;
   onDeleteTrade: (id: string) => void;
-  onExport: () => void;
+  onExport: (accountId: string) => void;
   onImport: (file: File) => void;
   onImportText: (text: string) => void;
   onClonePortfolio: () => void;
@@ -892,7 +892,7 @@ export function PaperTradingView({
 필수 규칙:
 - schemaVersion은 "1.0"
 - exportPurpose는 "paper_trading"
-- accounts 배열에는 계좌 id, name, owner, initialCash, createdAt을 넣어줘
+- accounts 배열에는 계좌 1개만 넣어줘. id, name, owner, initialCash, createdAt을 포함해줘
 - trades 배열의 accountId는 accounts의 id와 반드시 일치해야 해
 - action은 "buy" 또는 "sell"만 사용해
 - ticker는 대문자로 써줘
@@ -937,7 +937,7 @@ export function PaperTradingView({
       <div className="flex flex-wrap gap-2">
         <button onClick={onAddAccount} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">계좌 추가</button>
         <button onClick={onAddTrade} disabled={!accounts.length} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-40">거래 추가</button>
-        <button onClick={onExport} disabled={!accounts.length} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-40">모의 내보내기</button>
+        <button onClick={() => selected && onExport(selected.account.id)} disabled={!selected} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-40">선택 계좌 내보내기</button>
         <button onClick={onClonePortfolio} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">현재 포트폴리오 복사</button>
         <button onClick={() => setShowPrompt((v) => !v)} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">AI 입력 예시</button>
         <button onClick={() => setShowPasteImport((v) => !v)} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">JSON 붙여넣기</button>
