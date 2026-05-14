@@ -832,7 +832,7 @@ export function usePortfolioApp() {
   function exportPaperTrading(accountId: string) {
     const snapshot = paperSnapshots.find((item) => item.account.id === accountId);
     if (!snapshot) {
-      notify('?대낫??紐⑥쓽怨꾩쥖瑜??좏깮?댁＜?몄슂');
+      notify('내보낼 모의계좌를 선택해주세요');
       return;
     }
     const safeName = snapshot.account.name.replace(/[\\/:*?"<>|]/g, '_').slice(0, 40) || 'account';
@@ -857,14 +857,14 @@ export function usePortfolioApp() {
     try {
       importPaperTradingJson(await file.text());
     } catch (error) {
-      notify(error instanceof Error ? error.message : '紐⑥쓽?ъ옄 媛?몄삤湲곗뿉 ?ㅽ뙣?덉뒿?덈떎');
+      notify(error instanceof Error ? error.message : '모의투자 가져오기에 실패했습니다');
     }
   }
 
   function importPaperTradingJson(raw: string) {
     try {
       const data = JSON.parse(raw) as { accounts?: PaperAccount[]; trades?: PaperTrade[] };
-      if (!Array.isArray(data.accounts) || !Array.isArray(data.trades)) throw new Error('紐⑥쓽?ъ옄 JSON ?뺤떇???꾨떃?덈떎');
+      if (!Array.isArray(data.accounts) || !Array.isArray(data.trades)) throw new Error('모의투자 JSON 형식이 아닙니다');
       if (data.accounts.length !== 1) throw new Error('계좌별 모의투자 JSON은 accounts가 1개여야 합니다');
       const account = data.accounts[0];
       if (!account?.id || !account.name) throw new Error('모의계좌 id와 name이 필요합니다');
@@ -877,23 +877,23 @@ export function usePortfolioApp() {
       setSelectedPaperAccountId(account.id);
       notify(`${account.name} 모의계좌를 불러왔습니다`);
     } catch (error) {
-      notify(error instanceof Error ? error.message : '紐⑥쓽?ъ옄 媛?몄삤湲곗뿉 ?ㅽ뙣?덉뒿?덈떎');
+      notify(error instanceof Error ? error.message : '모의투자 가져오기에 실패했습니다');
     }
   }
 
   function cloneCurrentPortfolioToPaper() {
     if (!rows.length) {
-      notify('蹂듭궗??蹂댁쑀 ?곗빱媛 ?놁뒿?덈떎');
+      notify('복사할 보유 티커가 없습니다');
       return;
     }
     const accountId = uid();
     const account: PaperAccount = {
       id: accountId,
-      name: `?꾩옱 ?ы듃?대━??蹂듭궗 ${today()}`,
+      name: `현재 포트폴리오 복사 ${today()}`,
       owner: 'me',
       initialCash: roundNumber(summary.totalCost + cash),
       createdAt: today(),
-      note: '?ㅺ퀎醫??꾩옱 蹂댁쑀 ?곹깭瑜?紐⑥쓽?ъ옄 ?쒖옉?먯쑝濡?蹂듭궗',
+      note: '실계좌 현재 보유 상태를 모의투자 시작점으로 복사',
     };
     const trades: PaperTrade[] = rows.map((row) => ({
       id: uid(),
@@ -905,14 +905,14 @@ export function usePortfolioApp() {
       price: row.avgCost,
       fee: 0,
       strategy: 'current-portfolio-import',
-      thesis: '?ㅺ퀎醫??꾩옱 蹂댁쑀 ?곹깭?먯꽌 ?앹꽦',
+      thesis: '실계좌 현재 보유 상태에서 생성',
       note: row.note ?? tickerMemos[row.ticker] ?? '',
     }));
     setPaperAccounts((prev) => [...prev, account]);
     setPaperTrades((prev) => [...trades, ...prev]);
     setSelectedPaperAccountId(accountId);
     setTab('paper');
-    notify('?꾩옱 ?ы듃?대━?ㅻ? 紐⑥쓽怨꾩쥖濡?蹂듭궗?덉뒿?덈떎');
+    notify('현재 포트폴리오를 모의계좌로 복사했습니다');
   }
 
   function buildPaperSnapshot(account: PaperAccount, tradesForAccount: PaperTrade[], quoteMap: PriceMap) {

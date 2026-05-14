@@ -326,6 +326,8 @@ export default function OpenPage() {
               onImport={importPaperTrading}
               onImportText={importPaperTradingJson}
               onClonePortfolio={cloneCurrentPortfolioToPaper}
+              krw={krw}
+              rate={rate}
             />
           )}
         </div>

@@ -865,6 +865,8 @@ export function PaperTradingView({
   onImport,
   onImportText,
   onClonePortfolio,
+  krw,
+  rate,
 }: {
   accounts: PaperAccount[];
   snapshots: PaperSnapshot[];
@@ -880,6 +882,8 @@ export function PaperTradingView({
   onImport: (file: File) => void;
   onImportText: (text: string) => void;
   onClonePortfolio: () => void;
+  krw: boolean;
+  rate: number;
 }) {
   const [importKey, setImportKey] = useState(0);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -1039,14 +1043,14 @@ export function PaperTradingView({
               </div>
               {selected && (
                 <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-                  <PaperMetric label="총자산" value={usd(selected.summary.totalAsset)} />
-                  <PaperMetric label="현금" value={usd(selected.summary.cash)} />
-                  <PaperMetric label="평가금액" value={usd(selected.summary.stockValue)} />
-                  <PaperMetric label="총손익" value={usd(selected.summary.totalPnl)} color={colorClass(selected.summary.totalPnl)} />
-                  <PaperMetric label="실현손익" value={usd(selected.summary.realizedPnl)} color={colorClass(selected.summary.realizedPnl)} />
-                  <PaperMetric label="미실현손익" value={usd(selected.summary.unrealizedPnl)} color={colorClass(selected.summary.unrealizedPnl)} />
+                  <PaperMetric label="총자산" value={money(selected.summary.totalAsset, krw, rate)} />
+                  <PaperMetric label="현금" value={money(selected.summary.cash, krw, rate)} />
+                  <PaperMetric label="평가금액" value={money(selected.summary.stockValue, krw, rate)} />
+                  <PaperMetric label="총손익" value={money(selected.summary.totalPnl, krw, rate)} color={colorClass(selected.summary.totalPnl)} />
+                  <PaperMetric label="실현손익" value={money(selected.summary.realizedPnl, krw, rate)} color={colorClass(selected.summary.realizedPnl)} />
+                  <PaperMetric label="미실현손익" value={money(selected.summary.unrealizedPnl, krw, rate)} color={colorClass(selected.summary.unrealizedPnl)} />
                   <PaperMetric label="거래 수" value={`${selected.summary.tradeCount}건`} />
-                  <PaperMetric label="시작 현금" value={usd(selected.account.initialCash)} />
+                  <PaperMetric label="시작 현금" value={money(selected.account.initialCash, krw, rate)} />
                 </div>
               )}
             </div>
@@ -1093,11 +1097,11 @@ export function PaperTradingView({
                     {selected.holdings.map((row) => (
                       <tr key={row.ticker} className="border-t border-border">
                         <td className="px-3 py-3 font-bold text-brand">{row.ticker}</td>
-                        <td className="px-3 py-3 text-right">{usd(row.price)}</td>
+                        <td className="px-3 py-3 text-right">{money(row.price, krw, rate)}</td>
                         <td className="px-3 py-3 text-right">{row.shares.toFixed(4).replace(/\.?0+$/, '')}</td>
-                        <td className="px-3 py-3 text-right">{usd(row.avgCost)}</td>
-                        <td className="px-3 py-3 text-right font-semibold">{usd(row.value)}</td>
-                        <td className={`px-3 py-3 text-right font-semibold ${colorClass(row.pnl)}`}>{usd(row.pnl)}<div className="text-xs">{pct(row.pnlPct)}</div></td>
+                        <td className="px-3 py-3 text-right">{money(row.avgCost, krw, rate)}</td>
+                        <td className="px-3 py-3 text-right font-semibold">{money(row.value, krw, rate)}</td>
+                        <td className={`px-3 py-3 text-right font-semibold ${colorClass(row.pnl)}`}>{money(row.pnl, krw, rate)}<div className="text-xs">{pct(row.pnlPct)}</div></td>
                         <td className="px-3 py-3 text-right">{row.weight.toFixed(1)}%</td>
                       </tr>
                     ))}
@@ -1119,9 +1123,9 @@ export function PaperTradingView({
                             <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${trade.action === 'buy' ? 'bg-blue-50 text-blue-700' : 'bg-rose-50 text-rose-700'}`}>{trade.action === 'buy' ? '매수' : '매도'}</span>
                           </div>
                         </div>
-                        <div className={`text-right font-bold ${trade.action === 'buy' ? 'text-blue-600' : 'text-rose-600'}`}>{usd(trade.shares * trade.price)}</div>
+                        <div className={`text-right font-bold ${trade.action === 'buy' ? 'text-blue-600' : 'text-rose-600'}`}>{money(trade.shares * trade.price, krw, rate)}</div>
                       </div>
-                      <div className="mt-2 text-xs text-sub">수량 {trade.shares} · 단가 {usd(trade.price)} · {trade.strategy || '전략 없음'}</div>
+                      <div className="mt-2 text-xs text-sub">수량 {trade.shares} · 단가 {money(trade.price, krw, rate)} · {trade.strategy || '전략 없음'}</div>
                       {trade.thesis && <p className="mt-2 text-xs leading-5 text-sub">근거: {trade.thesis}</p>}
                       {trade.risk && <p className="mt-1 text-xs leading-5 text-sub">리스크: {trade.risk}</p>}
                       {trade.review && <p className="mt-1 text-xs leading-5 text-sub">복기: {trade.review}</p>}
