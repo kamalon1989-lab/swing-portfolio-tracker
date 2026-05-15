@@ -519,11 +519,28 @@ export function usePortfolioApp() {
 
   function saveTrade(item: JournalItem, syncHolding: boolean) {
     const trade = { ...item, ticker: normalizeTicker(item.ticker), id: item.id || uid() };
-    if (!trade.ticker || !trade.shares || !trade.price) {
+    const isCashFlow = trade.action === 'deposit' || trade.action === 'withdraw';
+    if (isCashFlow) {
+      if (!trade.price) {
+        notify('입출금 금액은 필수입니다');
+        return;
+      }
+      trade.ticker = 'CASH';
+      trade.shares = 1;
+      trade.fee = 0;
+    } else if (!trade.ticker || !trade.shares || !trade.price) {
       notify('티커, 수량, 단가는 필수입니다');
       return;
     }
-    if (syncHolding && !editingTrade) {
+    const previousCashImpact = editingTrade && (editingTrade.action === 'deposit' || editingTrade.action === 'withdraw')
+      ? (editingTrade.action === 'deposit' ? 1 : -1) * editingTrade.price
+      : 0;
+    if (isCashFlow) {
+      const nextCashImpact = (trade.action === 'deposit' ? 1 : -1) * trade.price;
+      setCash((prev) => prev + nextCashImpact - previousCashImpact);
+    } else if (previousCashImpact) {
+      setCash((prev) => prev - previousCashImpact);
+    } else if (syncHolding && !editingTrade) {
       setCash((prev) => prev + (trade.action === 'buy' ? -1 : 1) * trade.shares * trade.price - (trade.fee || 0));
       setHoldings((prev) => {
         const idx = prev.findIndex((x) => x.ticker === trade.ticker);
@@ -552,6 +569,15 @@ export function usePortfolioApp() {
     setJournal((prev) => (editingTrade ? prev.map((x) => (x.id === editingTrade.id ? trade : x)) : [...prev, trade]));
     setShowTradeForm(false);
     setEditingTrade(null);
+  }
+
+  function deleteTrade(id: string) {
+    const trade = journal.find((item) => item.id === id);
+    if (trade?.action === 'deposit' || trade?.action === 'withdraw') {
+      const cashImpact = (trade.action === 'deposit' ? 1 : -1) * trade.price;
+      setCash((prev) => prev - cashImpact);
+    }
+    setJournal((prev) => prev.filter((item) => item.id !== id));
   }
 
   function recordToday(date: string) {
@@ -643,14 +669,15 @@ export function usePortfolioApp() {
     const exportedTrades = journal.map((trade) => {
       const shares = roundNumber(trade.shares, 4);
       const price = roundNumber(trade.price);
+      const isCashFlow = trade.action === 'deposit' || trade.action === 'withdraw';
       return {
         id: trade.id,
         date: trade.date,
         side: trade.action.toUpperCase(),
-        ticker: trade.ticker,
+        ticker: isCashFlow ? 'CASH' : trade.ticker,
         shares,
         price,
-        amount: roundNumber(shares * price),
+        amount: roundNumber(isCashFlow ? price : shares * price),
         fee: roundNumber(trade.fee ?? 0),
         strategy: trade.strategy || '-',
         memo: trade.note ?? '',
@@ -1101,6 +1128,7 @@ export function usePortfolioApp() {
     saveHolding,
     saveWatch,
     saveTrade,
+    deleteTrade,
     saveCash,
     recordToday,
     saveHistory,

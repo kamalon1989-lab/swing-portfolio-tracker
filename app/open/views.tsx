@@ -729,11 +729,40 @@ function WatchDistanceChart({ watch, prices }: { watch: WatchItem[]; prices: Pri
   );
 }
 
+function isCashFlowJournal(item: JournalItem) {
+  return item.action === 'deposit' || item.action === 'withdraw';
+}
+
+function journalAmount(item: JournalItem) {
+  return isCashFlowJournal(item) ? item.price : item.shares * item.price;
+}
+
+function journalActionLabel(action: JournalItem['action']) {
+  if (action === 'buy') return '매수';
+  if (action === 'sell') return '매도';
+  if (action === 'deposit') return '입금';
+  return '출금';
+}
+
+function journalActionClass(action: JournalItem['action']) {
+  if (action === 'buy') return 'bg-blue-50 text-blue-700';
+  if (action === 'sell') return 'bg-rose-50 text-rose-700';
+  if (action === 'deposit') return 'bg-emerald-50 text-emerald-700';
+  return 'bg-amber-50 text-amber-700';
+}
+
+function journalAmountClass(action: JournalItem['action']) {
+  if (action === 'buy') return 'text-blue-600';
+  if (action === 'sell') return 'text-rose-600';
+  if (action === 'deposit') return 'text-emerald-600';
+  return 'text-amber-600';
+}
+
 function JournalSummary({ journal }: { journal: JournalItem[] }) {
-  const sells = journal.filter((j) => j.action === 'sell');
-  if (!sells.length) return null;
+  const tradeJournal = journal.filter((j) => j.action === 'buy' || j.action === 'sell');
+  const sells = tradeJournal.filter((j) => j.action === 'sell');
   const totalBuyMap: Record<string, { cost: number; shares: number }> = {};
-  journal.filter((j) => j.action === 'buy').forEach((j) => {
+  tradeJournal.filter((j) => j.action === 'buy').forEach((j) => {
     if (!totalBuyMap[j.ticker]) totalBuyMap[j.ticker] = { cost: 0, shares: 0 };
     totalBuyMap[j.ticker].cost += j.shares * j.price;
     totalBuyMap[j.ticker].shares += j.shares;
@@ -756,18 +785,23 @@ function JournalSummary({ journal }: { journal: JournalItem[] }) {
     }
   });
   const winRate = sells.length ? (wins / sells.length) * 100 : 0;
-  const totalBuy = journal.filter((j) => j.action === 'buy').reduce((s, j) => s + j.shares * j.price, 0);
+  const totalBuy = tradeJournal.filter((j) => j.action === 'buy').reduce((s, j) => s + j.shares * j.price, 0);
   const totalSell = sells.reduce((s, j) => s + j.shares * j.price, 0);
+  const totalDeposit = journal.filter((j) => j.action === 'deposit').reduce((s, j) => s + j.price, 0);
+  const totalWithdraw = journal.filter((j) => j.action === 'withdraw').reduce((s, j) => s + j.price, 0);
   const strategyEntries = Object.entries(strategyStats).sort((a, b) => b[1].total - a[1].total);
+  const summaryCards = [
+    ['총 매수 금액', usd(totalBuy), 'text-blue-600'],
+    ['총 매도 금액', usd(totalSell), 'text-rose-600'],
+    ['실현 손익', usd(realizedPnl), colorClass(realizedPnl)],
+    ['매도 승률', `${winRate.toFixed(0)}% (${wins}/${sells.length})`, colorClass(winRate - 50)],
+    ['예수금 입금', usd(totalDeposit), 'text-emerald-600'],
+    ['예수금 출금', usd(totalWithdraw), 'text-amber-600'],
+  ];
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-4">
-        {[
-          ['총 매수 금액', usd(totalBuy), 'text-blue-600'],
-          ['총 매도 금액', usd(totalSell), 'text-rose-600'],
-          ['실현 손익', usd(realizedPnl), colorClass(realizedPnl)],
-          ['매도 승률', `${winRate.toFixed(0)}% (${wins}/${sells.length})`, colorClass(winRate - 50)],
-        ].map(([label, value, color]) => (
+      <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        {summaryCards.map(([label, value, color]) => (
           <div key={label} className="rounded-xl border border-border bg-card p-4">
             <div className="text-xs font-semibold uppercase text-sub">{label}</div>
             <div className={`mt-2 text-lg font-extrabold ${color}`}>{value}</div>
@@ -810,19 +844,19 @@ export function JournalView({ journal, onAdd, onEdit, onDelete }: { journal: Jou
               <div>
                 <div className="text-xs text-sub">{j.date}</div>
                 <div className="mt-1 flex items-center gap-2">
-                  <strong>{j.ticker}</strong>
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${j.action === 'buy' ? 'bg-blue-50 text-blue-700' : 'bg-rose-50 text-rose-700'}`}>{j.action === 'buy' ? '매수' : '매도'}</span>
+                  <strong>{isCashFlowJournal(j) ? '예수금' : j.ticker}</strong>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${journalActionClass(j.action)}`}>{journalActionLabel(j.action)}</span>
                 </div>
               </div>
-              <div className={`text-right font-bold ${j.action === 'buy' ? 'text-blue-600' : 'text-rose-600'}`}>{usd(j.shares * j.price)}</div>
+              <div className={`text-right font-bold ${journalAmountClass(j.action)}`}>{usd(journalAmount(j))}</div>
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
               <div className="rounded-xl bg-bg p-2">
                 <div className="text-sub">수량</div>
-                <div className="mt-1 font-bold">{j.shares}</div>
+                <div className="mt-1 font-bold">{isCashFlowJournal(j) ? '-' : j.shares}</div>
               </div>
               <div className="rounded-xl bg-bg p-2">
-                <div className="text-sub">단가</div>
+                <div className="text-sub">{isCashFlowJournal(j) ? '금액' : '단가'}</div>
                 <div className="mt-1 font-bold">{usd(j.price)}</div>
               </div>
               <div className="rounded-xl bg-bg p-2">
@@ -841,8 +875,8 @@ export function JournalView({ journal, onAdd, onEdit, onDelete }: { journal: Jou
       </div>
       <div className="hidden overflow-x-auto rounded-xl border border-border bg-card sm:block">
         <table className="w-full min-w-[900px] text-sm">
-          <thead className="bg-bg text-xs text-sub"><tr><th className="px-3 py-3 text-left">날짜</th><th className="px-3 py-3">구분</th><th className="px-3 py-3 text-left">티커</th><th className="px-3 py-3 text-right">수량</th><th className="px-3 py-3 text-right">단가</th><th className="px-3 py-3 text-right">금액</th><th className="px-3 py-3 text-left">전략</th><th className="px-3 py-3 text-left">메모</th><th className="px-3 py-3 text-right">관리</th></tr></thead>
-          <tbody>{sorted.map((j) => <tr key={j.id} className="border-t border-border"><td className="px-3 py-3">{j.date}</td><td className="px-3 py-3 text-center"><span className={`rounded-full px-2 py-1 text-xs font-bold ${j.action === 'buy' ? 'bg-blue-50 text-blue-700' : 'bg-rose-50 text-rose-700'}`}>{j.action === 'buy' ? '매수' : '매도'}</span></td><td className="px-3 py-3 font-bold">{j.ticker}</td><td className="px-3 py-3 text-right">{j.shares}</td><td className="px-3 py-3 text-right">{usd(j.price)}</td><td className={`px-3 py-3 text-right font-semibold ${j.action === 'buy' ? 'text-blue-600' : 'text-rose-600'}`}>{usd(j.shares * j.price)}</td><td className="px-3 py-3">{j.strategy ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{j.strategy}</span> : <span className="text-sub">-</span>}</td><td className="px-3 py-3 text-sub">{j.note || '-'}</td><td className="px-3 py-3 text-right"><button onClick={() => onEdit(j)} className="no-print mr-2 text-brand">수정</button><button onClick={() => onDelete(j.id)} className="no-print text-rose-600">삭제</button></td></tr>)}</tbody>
+          <thead className="bg-bg text-xs text-sub"><tr><th className="px-3 py-3 text-left">날짜</th><th className="px-3 py-3">구분</th><th className="px-3 py-3 text-left">티커</th><th className="px-3 py-3 text-right">수량</th><th className="px-3 py-3 text-right">단가/금액</th><th className="px-3 py-3 text-right">금액</th><th className="px-3 py-3 text-left">전략</th><th className="px-3 py-3 text-left">메모</th><th className="px-3 py-3 text-right">관리</th></tr></thead>
+          <tbody>{sorted.map((j) => <tr key={j.id} className="border-t border-border"><td className="px-3 py-3">{j.date}</td><td className="px-3 py-3 text-center"><span className={`rounded-full px-2 py-1 text-xs font-bold ${journalActionClass(j.action)}`}>{journalActionLabel(j.action)}</span></td><td className="px-3 py-3 font-bold">{isCashFlowJournal(j) ? '-' : j.ticker}</td><td className="px-3 py-3 text-right">{isCashFlowJournal(j) ? '-' : j.shares}</td><td className="px-3 py-3 text-right">{usd(j.price)}</td><td className={`px-3 py-3 text-right font-semibold ${journalAmountClass(j.action)}`}>{usd(journalAmount(j))}</td><td className="px-3 py-3">{j.strategy ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{j.strategy}</span> : <span className="text-sub">-</span>}</td><td className="px-3 py-3 text-sub">{j.note || '-'}</td><td className="px-3 py-3 text-right"><button onClick={() => onEdit(j)} className="no-print mr-2 text-brand">수정</button><button onClick={() => onDelete(j.id)} className="no-print text-rose-600">삭제</button></td></tr>)}</tbody>
         </table>
         {!journal.length && <div className="p-12 text-center text-sm text-sub">거래 기록이 없습니다.</div>}
       </div>
@@ -1159,10 +1193,18 @@ function JournalFlowChart({ journal }: { journal: JournalItem[] }) {
   const data = useMemo(() => {
     const sortedJ = [...journal].sort((a, b) => a.date.localeCompare(b.date));
     const avgCostMap: Record<string, { cost: number; shares: number }> = {};
-    const months: Record<string, { month: string; buy: number; sell: number; realized: number }> = {};
+    const months: Record<string, { month: string; buy: number; sell: number; realized: number; deposit: number; withdraw: number }> = {};
     for (const item of sortedJ) {
       const month = item.date.slice(0, 7);
-      if (!months[month]) months[month] = { month, buy: 0, sell: 0, realized: 0 };
+      if (!months[month]) months[month] = { month, buy: 0, sell: 0, realized: 0, deposit: 0, withdraw: 0 };
+      if (item.action === 'deposit') {
+        months[month].deposit += item.price;
+        continue;
+      }
+      if (item.action === 'withdraw') {
+        months[month].withdraw += item.price;
+        continue;
+      }
       const amount = item.shares * item.price;
       if (item.action === 'buy') {
         months[month].buy += amount;
@@ -1203,7 +1245,7 @@ function JournalFlowChart({ journal }: { journal: JournalItem[] }) {
             <YAxis tickFormatter={compactUsd} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={58} />
             <Tooltip
               formatter={(value, name) => {
-                const labels: Record<string, string> = { buy: '매수', sell: '매도', realized: '실현 손익' };
+                const labels: Record<string, string> = { buy: '매수', sell: '매도', realized: '실현 손익', deposit: '예수금 입금', withdraw: '예수금 출금' };
                 return [usd(Number(value)), labels[String(name)] ?? String(name)];
               }}
               contentStyle={darkTooltip}
@@ -1212,6 +1254,8 @@ function JournalFlowChart({ journal }: { journal: JournalItem[] }) {
             <ReferenceLine y={0} stroke="#334155" />
             <Bar dataKey="buy" fill="#3b82f6" radius={[8, 8, 0, 0]} />
             <Bar dataKey="sell" fill="#fb7185" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="deposit" fill="#10b981" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="withdraw" fill="#f59e0b" radius={[8, 8, 0, 0]} />
             <Bar dataKey="realized" radius={[8, 8, 0, 0]}>
               {data.map((item) => (
                 <Cell key={item.month} fill={item.realized >= 0 ? '#34d399' : '#f43f5e'} />
@@ -1223,6 +1267,8 @@ function JournalFlowChart({ journal }: { journal: JournalItem[] }) {
       <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-400">
         <span><b className="text-blue-400">■</b> 매수</span>
         <span><b className="text-rose-400">■</b> 매도</span>
+        <span><b className="text-emerald-400">■</b> 입금</span>
+        <span><b className="text-amber-400">■</b> 출금</span>
         <span><b className="text-emerald-400">■</b> 실현 손익</span>
       </div>
     </div>
@@ -1239,21 +1285,24 @@ function MonthlyPnlCalendar({ journal }: { journal: JournalItem[] }) {
     const sortedJ = [...journal].sort((a, b) => a.date.localeCompare(b.date));
     const avgCostMap: Record<string, { cost: number; shares: number }> = {};
     const pnlByDate: Record<string, number> = {};
-    const activityByDate: Record<string, 'buy' | 'sell' | 'both'> = {};
+    const activityByDate: Record<string, 'buy' | 'sell' | 'cash' | 'both'> = {};
     for (const j of sortedJ) {
-      if (j.action === 'buy') {
+      if (j.action === 'deposit' || j.action === 'withdraw') {
+        if (!activityByDate[j.date]) activityByDate[j.date] = 'cash';
+        else if (activityByDate[j.date] !== 'cash') activityByDate[j.date] = 'both';
+      } else if (j.action === 'buy') {
         if (!avgCostMap[j.ticker]) avgCostMap[j.ticker] = { cost: 0, shares: 0 };
         avgCostMap[j.ticker].cost += j.shares * j.price;
         avgCostMap[j.ticker].shares += j.shares;
         if (!activityByDate[j.date]) activityByDate[j.date] = 'buy';
-        else if (activityByDate[j.date] === 'sell') activityByDate[j.date] = 'both';
+        else if (activityByDate[j.date] !== 'buy') activityByDate[j.date] = 'both';
       } else {
         const entry = avgCostMap[j.ticker];
         const avgCost = entry?.shares ? entry.cost / entry.shares : j.price;
         const pnl = (j.price - avgCost) * j.shares - (j.fee || 0);
         pnlByDate[j.date] = (pnlByDate[j.date] ?? 0) + pnl;
         if (!activityByDate[j.date]) activityByDate[j.date] = 'sell';
-        else activityByDate[j.date] = 'both';
+        else if (activityByDate[j.date] !== 'sell') activityByDate[j.date] = 'both';
       }
     }
     return { pnlByDate, activityByDate };
@@ -1303,6 +1352,7 @@ function MonthlyPnlCalendar({ journal }: { journal: JournalItem[] }) {
           if (pnl !== undefined && pnl > 0) bg = 'bg-emerald-50 text-emerald-800';
           else if (pnl !== undefined && pnl < 0) bg = 'bg-rose-50 text-rose-800';
           else if (activity === 'buy') bg = 'bg-blue-50 text-blue-700';
+          else if (activity === 'cash') bg = 'bg-amber-50 text-amber-700';
           const isToday = dateStr === todayStr;
           return (
             <div key={d} className={`flex min-h-[44px] flex-col items-center justify-start gap-0.5 rounded p-1 ${bg} ${isToday ? 'ring-1 ring-brand' : ''}`}>
@@ -1318,6 +1368,7 @@ function MonthlyPnlCalendar({ journal }: { journal: JournalItem[] }) {
         <span><b className="text-emerald-600">■</b> 매도 익절</span>
         <span><b className="text-rose-600">■</b> 매도 손절</span>
         <span><b className="text-blue-500">■</b> 매수만</span>
+        <span><b className="text-amber-500">■</b> 입출금</span>
       </div>
     </div>
   );

@@ -71,31 +71,54 @@ export function TradeForm({
     : '0.25';
   const [feePct, setFeePct] = useState(initialFeePct);
   const [sync, setSync] = useState(!item);
+  const isCashFlow = form.action === 'deposit' || form.action === 'withdraw';
   const tradeAmount = (Number(form.shares) || 0) * (Number(form.price) || 0);
   const feeAmount = tradeAmount * ((Number(feePct) || 0) / 100);
   function submit(e: FormEvent) {
     e.preventDefault();
+    if (isCashFlow) {
+      onSave({ ...form, ticker: 'CASH', shares: 1, fee: 0, strategy: form.action === 'deposit' ? '예수금 입금' : '예수금 출금' }, true);
+      return;
+    }
     onSave({ ...form, fee: feeAmount }, sync);
   }
   return (
     <Modal title={item ? '거래 수정' : '거래 추가'} onClose={onClose}>
       <form className="grid grid-cols-2 items-start gap-3" onSubmit={submit}>
         <Field label="날짜" required><input className={inputClass()} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></Field>
-        <Field label="구분" required><select className={inputClass()} value={form.action} onChange={(e) => setForm({ ...form, action: e.target.value as 'buy' | 'sell' })}><option value="buy">매수</option><option value="sell">매도</option></select></Field>
-        <Field label="티커" required><input className={`${inputClass()} uppercase`} value={form.ticker} onChange={(e) => setForm({ ...form, ticker: e.target.value.toUpperCase() })} /></Field>
-        <Field label="수량" required><input className={inputClass()} type="number" step="0.0001" value={form.shares || ''} onChange={(e) => setForm({ ...form, shares: Number(e.target.value) })} /></Field>
-        <Field label="단가" required><input className={inputClass()} type="number" step="0.01" value={form.price || ''} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} /></Field>
-        <Field label="수수료율 (%)" optional>
-          <input className={inputClass()} type="number" step="0.01" min="0" value={feePct} onChange={(e) => setFeePct(e.target.value)} />
-          <div className="mt-1 text-xs text-sub">예상 수수료 {usd(feeAmount)}</div>
+        <Field label="구분" required>
+          <select className={inputClass()} value={form.action} onChange={(e) => setForm({ ...form, action: e.target.value as JournalItem['action'] })}>
+            <option value="buy">매수</option>
+            <option value="sell">매도</option>
+            <option value="deposit">예수금 입금</option>
+            <option value="withdraw">예수금 출금</option>
+          </select>
         </Field>
-        <label className="col-span-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={sync} disabled={!!item} onChange={(e) => setSync(e.target.checked)} /> 보유 종목과 예수금에 반영</label>
-        <Field label="전략" optional>
-          <input list="strategy-list" className={inputClass()} value={form.strategy ?? ''} placeholder="예: 브레이크아웃, 눌림목..." onChange={(e) => setForm({ ...form, strategy: e.target.value })} />
-          <datalist id="strategy-list">
-            {['브레이크아웃', '눌림목', '반등매수', '추세추종', '역추세', '실적플레이'].map(s => <option key={s} value={s} />)}
-          </datalist>
-        </Field>
+        {isCashFlow ? (
+          <>
+            <Field label="금액" required><input className={inputClass()} type="number" step="0.01" value={form.price || ''} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} /></Field>
+            <div className="col-span-2 rounded-xl border border-border bg-bg p-3 text-xs leading-5 text-sub">
+              저장하면 예수금에 바로 반영됩니다. 입금은 예수금 증가, 출금은 예수금 감소로 기록됩니다.
+            </div>
+          </>
+        ) : (
+          <>
+            <Field label="티커" required><input className={`${inputClass()} uppercase`} value={form.ticker} onChange={(e) => setForm({ ...form, ticker: e.target.value.toUpperCase() })} /></Field>
+            <Field label="수량" required><input className={inputClass()} type="number" step="0.0001" value={form.shares || ''} onChange={(e) => setForm({ ...form, shares: Number(e.target.value) })} /></Field>
+            <Field label="단가" required><input className={inputClass()} type="number" step="0.01" value={form.price || ''} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} /></Field>
+            <Field label="수수료율 (%)" optional>
+              <input className={inputClass()} type="number" step="0.01" min="0" value={feePct} onChange={(e) => setFeePct(e.target.value)} />
+              <div className="mt-1 text-xs text-sub">예상 수수료 {usd(feeAmount)}</div>
+            </Field>
+            <label className="col-span-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={sync} disabled={!!item} onChange={(e) => setSync(e.target.checked)} /> 보유 종목과 예수금에 반영</label>
+            <Field label="전략" optional>
+              <input list="strategy-list" className={inputClass()} value={form.strategy ?? ''} placeholder="예: 브레이크아웃, 눌림목..." onChange={(e) => setForm({ ...form, strategy: e.target.value })} />
+              <datalist id="strategy-list">
+                {['브레이크아웃', '눌림목', '반등매수', '추세추종', '역추세', '실적플레이'].map(s => <option key={s} value={s} />)}
+              </datalist>
+            </Field>
+          </>
+        )}
         <Field label="메모" optional><input className={inputClass()} value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></Field>
         <button className="sticky bottom-0 z-10 col-span-2 -mx-1 rounded-lg bg-brand px-4 py-3 font-bold text-white shadow-lg sm:static sm:mx-0 sm:py-2 sm:shadow-none">저장</button>
       </form>

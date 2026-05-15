@@ -112,6 +112,7 @@ export default function OpenPage() {
     saveHolding,
     saveWatch,
     saveTrade,
+    deleteTrade,
     saveCash,
     recordToday,
     saveHistory,
@@ -307,7 +308,7 @@ export default function OpenPage() {
               journal={journal}
               onAdd={() => { setEditingTrade(null); setShowTradeForm(true); }}
               onEdit={(item) => { setEditingTrade(item); setShowTradeForm(true); }}
-              onDelete={(id) => setJournal((prev) => prev.filter((x) => x.id !== id))}
+              onDelete={deleteTrade}
             />
           )}
           {tab === 'paper' && (

@@ -87,7 +87,7 @@ export interface WatchItem {
 export interface JournalItem {
   id: string;
   date: string;
-  action: 'buy' | 'sell';
+  action: 'buy' | 'sell' | 'deposit' | 'withdraw';
   ticker: string;
   shares: number;
   price: number;
