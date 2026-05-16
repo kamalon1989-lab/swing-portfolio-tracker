@@ -477,13 +477,18 @@ function AiInsightPanel({
   tickers,
   onSave,
   onDelete,
+  panelTitle = 'ChatGPT 분석 기록',
+  description = 'ChatGPT 답변을 붙여넣어 전체 포트폴리오나 티커별 메모로 보관합니다.',
 }: {
   insights: AiInsightItem[];
   tickers: string[];
   onSave: (item: Omit<AiInsightItem, 'id'> & { id?: string }) => void;
   onDelete: (id: string) => void;
+  panelTitle?: string;
+  description?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [selectedInsight, setSelectedInsight] = useState<AiInsightItem | null>(null);
   const [scope, setScope] = useState<AiInsightItem['scope']>('portfolio');
   const [ticker, setTicker] = useState(tickers[0] ?? '');
   const [title, setTitle] = useState('');
@@ -506,8 +511,8 @@ function AiInsightPanel({
     <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-bold text-slate-100">ChatGPT 분석 기록</h2>
-          <p className="mt-1 text-xs text-slate-400">ChatGPT 답변을 붙여넣어 전체 포트폴리오나 티커별 메모로 보관합니다.</p>
+          <h2 className="font-bold text-slate-100">{panelTitle}</h2>
+          <p className="mt-1 text-xs text-slate-400">{description}</p>
         </div>
         <button type="button" onClick={() => setOpen((value) => !value)} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">
           {open ? '닫기' : '답변 붙여넣기'}
@@ -551,15 +556,34 @@ function AiInsightPanel({
           {recent.map((item) => (
             <article key={item.id} className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
+                <button type="button" onClick={() => setSelectedInsight(item)} className="min-w-0 flex-1 text-left">
                   <div className="text-[11px] font-bold text-slate-400">{item.date} · {item.ticker ?? '전체'}</div>
                   <h3 className="mt-1 truncate text-sm font-bold text-slate-100">{item.title}</h3>
-                </div>
+                </button>
                 <button type="button" onClick={() => onDelete(item.id)} className="text-xs font-bold text-rose-300">삭제</button>
               </div>
-              <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-xs leading-5 text-slate-400">{item.content}</p>
+              <button type="button" onClick={() => setSelectedInsight(item)} className="mt-2 block w-full text-left">
+                <p className="line-clamp-3 whitespace-pre-wrap text-xs leading-5 text-slate-400">{item.content}</p>
+                <span className="mt-2 inline-flex text-xs font-bold text-sky-300">크게 보기</span>
+              </button>
             </article>
           ))}
+        </div>
+      )}
+      {selectedInsight && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4">
+          <section className="max-h-[86vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-800 p-4">
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-slate-400">{selectedInsight.date} · {selectedInsight.ticker ?? '전체 포트폴리오'} · {selectedInsight.source ?? 'ChatGPT'}</div>
+                <h3 className="mt-1 text-lg font-extrabold text-slate-100">{selectedInsight.title}</h3>
+              </div>
+              <button type="button" onClick={() => setSelectedInsight(null)} className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-300">닫기</button>
+            </div>
+            <div className="max-h-[68vh] overflow-y-auto p-5">
+              <p className="whitespace-pre-wrap text-sm leading-7 text-slate-200">{selectedInsight.content}</p>
+            </div>
+          </section>
         </div>
       )}
     </section>
@@ -667,6 +691,8 @@ export function WatchView({
   tickerMemos,
   onSaveMemo,
   aiInsights = [],
+  onSaveAiInsight,
+  onDeleteAiInsight,
 }: {
   watch: WatchItem[];
   prices: PriceMap;
@@ -683,6 +709,8 @@ export function WatchView({
   tickerMemos: Record<string, string>;
   onSaveMemo: (ticker: string, text: string) => void;
   aiInsights?: AiInsightItem[];
+  onSaveAiInsight?: (item: Omit<AiInsightItem, 'id'> & { id?: string }) => void;
+  onDeleteAiInsight?: (id: string) => void;
 }) {
   const [mobileTicker, setMobileTicker] = useState('');
   const watchTickers = new Set(watch.map((item) => item.ticker));
@@ -699,6 +727,16 @@ export function WatchView({
         <button onClick={onExportTradingView} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">TradingView 복사</button>
       </div>
       <PriceAlerts alerts={alerts} />
+      {onSaveAiInsight && onDeleteAiInsight && (
+        <AiInsightPanel
+          insights={aiInsights}
+          tickers={watch.map((item) => item.ticker)}
+          onSave={onSaveAiInsight}
+          onDelete={onDeleteAiInsight}
+          panelTitle="관심 종목 ChatGPT 분석"
+          description="관심 종목에 대한 ChatGPT 답변을 붙여넣고 티커별 분석으로 보관합니다."
+        />
+      )}
       <WatchDistanceChart watch={watch} prices={prices} />
       <div className="space-y-3 sm:hidden">
         {watch.map((w) => {

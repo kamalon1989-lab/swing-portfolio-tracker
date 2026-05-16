@@ -296,6 +296,8 @@ export default function OpenPage() {
               tickerMemos={tickerMemos}
               onSaveMemo={saveTickerMemo}
               aiInsights={aiInsights}
+              onSaveAiInsight={saveAiInsight}
+              onDeleteAiInsight={deleteAiInsight}
               onExportTradingView={() => {
                 const text = watch.map((item) => item.ticker).filter(Boolean).join(',');
                 if (!text) {
