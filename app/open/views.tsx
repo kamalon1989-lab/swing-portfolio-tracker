@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   Area,
@@ -44,6 +44,11 @@ type HoldingRow = HoldingItem & {
   priceSource?: Price['source'];
   regularPrice?: number;
   extendedPrice?: number;
+  marketCap?: number;
+  trailingPE?: number;
+  forwardPE?: number;
+  regularMarketVolume?: number;
+  averageVolume?: number;
   regularChangePercent?: number;
   extendedChangePercent?: number;
 };
@@ -143,6 +148,28 @@ const darkTooltip = {
   color: '#e2e8f0',
 };
 
+function DesktopSidePanel({ children, width = 400 }: { children: ReactNode; width?: number }) {
+  const [top, setTop] = useState(76);
+  useEffect(() => {
+    const sync = () => setTop(Math.max(0, 76 - window.scrollY));
+    sync();
+    window.addEventListener('scroll', sync, { passive: true });
+    return () => window.removeEventListener('scroll', sync);
+  }, []);
+  return (
+    <div
+      className="fixed bottom-6 z-20 space-y-4 overflow-y-auto pr-1"
+      style={{
+        top,
+        width,
+        right: 'max(2rem, calc((100vw - 1540px) / 2 + 2rem))',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function PortfolioView(props: {
   rows: HoldingRow[];
   summary: { stockValue: number; totalCost: number; totalPnl: number; totalPnlPct: number; dayPnl: number; totalAsset: number };
@@ -212,7 +239,7 @@ export function PortfolioView(props: {
   };
   return (
     <section>
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_440px]">
         <div className="space-y-4">
       <div className={`grid gap-3 ${cards.length === 6 ? 'sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6' : 'md:grid-cols-5'}`}>
         {cards.map(([label, value, sub, color]) => (
@@ -361,20 +388,16 @@ export function PortfolioView(props: {
       <div className="hidden gap-4 sm:grid xl:hidden lg:grid-cols-[1fr_360px]">
         <div className="space-y-4">
           <PositionPathChart row={selectedRow} />
-          <TickerDetail ticker={detailTicker} theme={props.theme} earnings={holdingEarnings} memo={props.tickerMemos[detailTicker] ?? selectedRow?.note ?? ''} aiInsights={props.aiInsights.filter((item) => (item.category ?? 'portfolio') === 'portfolio' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => props.onSaveMemo(detailTicker, text) : undefined} />
+          <TickerDetail ticker={detailTicker} theme={props.theme} quote={selectedRow} memo={props.tickerMemos[detailTicker] ?? selectedRow?.note ?? ''} aiInsights={props.aiInsights.filter((item) => (item.category ?? 'portfolio') === 'portfolio' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => props.onSaveMemo(detailTicker, text) : undefined} />
         </div>
-        <EarningsPanel earnings={holdingEarnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
       </div>
+      <EarningsPanel earnings={holdingEarnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
         </div>
         <aside className="hidden xl:block xl:self-start">
-          <div
-            className="fixed bottom-6 top-24 z-20 w-[380px] space-y-4 overflow-y-auto pr-1"
-            style={{ right: 'max(1.5rem, calc((100vw - 1540px) / 2 + 1.5rem))' }}
-          >
+          <DesktopSidePanel width={400}>
             <PositionPathChart row={selectedRow} />
-            <TickerDetail ticker={detailTicker} theme={props.theme} earnings={holdingEarnings} memo={props.tickerMemos[detailTicker] ?? selectedRow?.note ?? ''} aiInsights={props.aiInsights.filter((item) => (item.category ?? 'portfolio') === 'portfolio' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => props.onSaveMemo(detailTicker, text) : undefined} />
-            <EarningsPanel earnings={holdingEarnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
-          </div>
+            <TickerDetail ticker={detailTicker} theme={props.theme} quote={selectedRow} memo={props.tickerMemos[detailTicker] ?? selectedRow?.note ?? ''} aiInsights={props.aiInsights.filter((item) => (item.category ?? 'portfolio') === 'portfolio' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => props.onSaveMemo(detailTicker, text) : undefined} />
+          </DesktopSidePanel>
         </aside>
       </div>
       <MobileTickerSheet
@@ -736,7 +759,7 @@ export function WatchView({
   };
   return (
     <section>
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_440px]">
         <div className="space-y-4">
       <div className="no-print flex flex-wrap gap-2">
         <button onClick={onAdd} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">관심 종목 추가</button>
@@ -822,18 +845,14 @@ export function WatchView({
         {!watch.length && <div className="p-12 text-center text-sm text-sub">관심 종목이 없습니다.</div>}
       </div>
       <div className="hidden gap-4 sm:grid xl:hidden lg:grid-cols-[1fr_360px]">
-        <TickerDetail ticker={detailTicker} theme={theme} earnings={watchEarnings} memo={tickerMemos[detailTicker] ?? ''} aiInsights={aiInsights.filter((item) => item.category === 'watchlist' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => onSaveMemo(detailTicker, text) : undefined} />
-        <EarningsPanel earnings={watchEarnings} loading={loadingEarnings} onRefresh={onRefreshEarnings} />
+        <TickerDetail ticker={detailTicker} theme={theme} quote={prices[detailTicker]} memo={tickerMemos[detailTicker] ?? ''} aiInsights={aiInsights.filter((item) => item.category === 'watchlist' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => onSaveMemo(detailTicker, text) : undefined} />
       </div>
+      <EarningsPanel earnings={watchEarnings} loading={loadingEarnings} onRefresh={onRefreshEarnings} />
         </div>
         <aside className="hidden xl:block xl:self-start">
-          <div
-            className="fixed bottom-6 top-24 z-20 w-[380px] space-y-4 overflow-y-auto pr-1"
-            style={{ right: 'max(1.5rem, calc((100vw - 1540px) / 2 + 1.5rem))' }}
-          >
-            <TickerDetail ticker={detailTicker} theme={theme} earnings={watchEarnings} memo={tickerMemos[detailTicker] ?? ''} aiInsights={aiInsights.filter((item) => item.category === 'watchlist' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => onSaveMemo(detailTicker, text) : undefined} />
-            <EarningsPanel earnings={watchEarnings} loading={loadingEarnings} onRefresh={onRefreshEarnings} />
-          </div>
+          <DesktopSidePanel width={400}>
+            <TickerDetail ticker={detailTicker} theme={theme} quote={prices[detailTicker]} memo={tickerMemos[detailTicker] ?? ''} aiInsights={aiInsights.filter((item) => item.category === 'watchlist' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => onSaveMemo(detailTicker, text) : undefined} />
+          </DesktopSidePanel>
         </aside>
       </div>
       <MobileTickerSheet
@@ -920,10 +939,11 @@ function journalActionLabel(action: JournalItem['action']) {
 }
 
 function journalActionClass(action: JournalItem['action']) {
-  if (action === 'buy') return 'bg-blue-50 text-blue-700';
-  if (action === 'sell') return 'bg-rose-50 text-rose-700';
-  if (action === 'deposit') return 'bg-emerald-50 text-emerald-700';
-  return 'bg-amber-50 text-amber-700';
+  const base = 'inline-flex shrink-0 items-center justify-center whitespace-nowrap leading-none';
+  if (action === 'buy') return `${base} bg-blue-50 text-blue-700`;
+  if (action === 'sell') return `${base} bg-rose-50 text-rose-700`;
+  if (action === 'deposit') return `${base} bg-emerald-50 text-emerald-700`;
+  return `${base} bg-amber-50 text-amber-700`;
 }
 
 function journalAmountClass(action: JournalItem['action']) {
@@ -1007,7 +1027,7 @@ function JournalSummary({ journal }: { journal: JournalItem[] }) {
 export function JournalView({ journal, onAdd, onEdit, onDelete }: { journal: JournalItem[]; onAdd: () => void; onEdit: (item: JournalItem) => void; onDelete: (id: string) => void }) {
   const sorted = [...journal].sort((a, b) => b.date.localeCompare(a.date));
   return (
-    <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <section className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
       <div className="space-y-4">
       <button onClick={onAdd} className="no-print rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">거래 추가</button>
       <JournalSummary journal={journal} />
@@ -1052,7 +1072,7 @@ export function JournalView({ journal, onAdd, onEdit, onDelete }: { journal: Jou
       <div className="hidden overflow-x-auto rounded-xl border border-border bg-card sm:block">
         <table className="w-full min-w-[900px] text-sm">
           <thead className="bg-bg text-xs text-sub"><tr><th className="px-3 py-3 text-left">날짜</th><th className="px-3 py-3">구분</th><th className="px-3 py-3 text-left">티커</th><th className="px-3 py-3 text-right">수량</th><th className="px-3 py-3 text-right">단가/금액</th><th className="px-3 py-3 text-right">금액</th><th className="px-3 py-3 text-left">전략</th><th className="px-3 py-3 text-left">메모</th><th className="px-3 py-3 text-right">관리</th></tr></thead>
-          <tbody>{sorted.map((j) => <tr key={j.id} className="border-t border-border"><td className="px-3 py-3">{j.date}</td><td className="px-3 py-3 text-center"><span className={`rounded-full px-2 py-1 text-xs font-bold ${journalActionClass(j.action)}`}>{journalActionLabel(j.action)}</span></td><td className="px-3 py-3 font-bold">{isCashFlowJournal(j) ? '-' : j.ticker}</td><td className="px-3 py-3 text-right">{isCashFlowJournal(j) ? '-' : j.shares}</td><td className="px-3 py-3 text-right">{usd(j.price)}</td><td className={`px-3 py-3 text-right font-semibold ${journalAmountClass(j.action)}`}>{usd(journalAmount(j))}</td><td className="px-3 py-3">{j.strategy ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{j.strategy}</span> : <span className="text-sub">-</span>}</td><td className="px-3 py-3 text-sub">{j.note || '-'}</td><td className="px-3 py-3 text-right"><button onClick={() => onEdit(j)} className="no-print mr-2 text-brand">수정</button><button onClick={() => onDelete(j.id)} className="no-print text-rose-600">삭제</button></td></tr>)}</tbody>
+          <tbody>{sorted.map((j) => <tr key={j.id} className="border-t border-border"><td className="px-3 py-3">{j.date}</td><td className="px-3 py-3 text-center"><span className={`rounded-full px-2 py-1 text-xs font-bold ${journalActionClass(j.action)}`}>{journalActionLabel(j.action)}</span></td><td className="px-3 py-3 font-bold">{isCashFlowJournal(j) ? '-' : j.ticker}</td><td className="px-3 py-3 text-right">{isCashFlowJournal(j) ? '-' : j.shares}</td><td className="px-3 py-3 text-right">{usd(j.price)}</td><td className={`px-3 py-3 text-right font-semibold ${journalAmountClass(j.action)}`}>{usd(journalAmount(j))}</td><td className="px-3 py-3">{j.strategy ? <span className="inline-flex max-w-[120px] whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold leading-none text-slate-600">{j.strategy}</span> : <span className="text-sub">-</span>}</td><td className="px-3 py-3 text-sub">{j.note || '-'}</td><td className="px-3 py-3 text-right"><button onClick={() => onEdit(j)} className="no-print mr-2 text-brand">수정</button><button onClick={() => onDelete(j.id)} className="no-print text-rose-600">삭제</button></td></tr>)}</tbody>
         </table>
         {!journal.length && <div className="p-12 text-center text-sm text-sub">거래 기록이 없습니다.</div>}
       </div>
@@ -1105,10 +1125,7 @@ function JournalSidePanel({ journal, onAdd }: { journal: JournalItem[]; onAdd: (
   const activeTickers = Object.entries(tickerCounts).filter(([, count]) => count >= 3).sort((a, b) => b[1] - a[1]).slice(0, 3);
   const lossReviews = sellReviews.filter((row) => row.pnl < 0).sort((a, b) => a.pnl - b.pnl).slice(0, 3);
   return (
-    <div
-      className="fixed bottom-6 top-24 z-20 w-[360px] space-y-4 overflow-y-auto pr-1"
-      style={{ right: 'max(1.5rem, calc((100vw - 1540px) / 2 + 1.5rem))' }}
-    >
+    <DesktopSidePanel width={380}>
       <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -1205,7 +1222,7 @@ function JournalSidePanel({ journal, onAdd }: { journal: JournalItem[]; onAdd: (
           </div>
         </div>
       </section>
-    </div>
+    </DesktopSidePanel>
   );
 }
 

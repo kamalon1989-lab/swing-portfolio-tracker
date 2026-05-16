@@ -288,6 +288,11 @@ export function usePortfolioApp() {
         priceSource: quote?.source,
         regularPrice: quote?.regularPrice,
         extendedPrice: quote?.extendedPrice,
+        marketCap: quote?.marketCap,
+        trailingPE: quote?.trailingPE,
+        forwardPE: quote?.forwardPE,
+        regularMarketVolume: quote?.regularMarketVolume,
+        averageVolume: quote?.averageVolume,
         regularChangePercent: quote?.regularChangePercent,
         extendedChangePercent: quote?.extendedChangePercent,
         value,
@@ -418,15 +423,25 @@ export function usePortfolioApp() {
 
     if (allowExtendedHours && (marketState === 'PRE' || marketState === 'PREPRE') && pre) {
       const extendedPct = percentFromPrev(pre, extendedBasePrice);
-      return { price: pre, changePercent: extendedPct, regularChangePercent: baseRegularPct, extendedChangePercent: extendedPct, prevClose: prevClose ?? pre, session: 'pre', source: 'yahoo', regularPrice: regular ?? undefined, extendedPrice: pre };
+      return { price: pre, changePercent: extendedPct, regularChangePercent: baseRegularPct, extendedChangePercent: extendedPct, prevClose: prevClose ?? pre, session: 'pre', source: 'yahoo', regularPrice: regular ?? undefined, extendedPrice: pre, ...parseYahooBasics(item) };
     }
     if (allowExtendedHours && (marketState === 'POST' || marketState === 'POSTPOST') && post) {
       const extendedPct = percentFromPrev(post, extendedBasePrice);
-      return { price: post, changePercent: extendedPct, regularChangePercent: baseRegularPct, extendedChangePercent: extendedPct, prevClose: prevClose ?? post, session: 'post', source: 'yahoo', regularPrice: regular ?? undefined, extendedPrice: post };
+      return { price: post, changePercent: extendedPct, regularChangePercent: baseRegularPct, extendedChangePercent: extendedPct, prevClose: prevClose ?? post, session: 'post', source: 'yahoo', regularPrice: regular ?? undefined, extendedPrice: post, ...parseYahooBasics(item) };
     }
     const price = regular ?? pre ?? post!;
     const changePercent = regularPct ?? percentFromPrev(price, prevClose);
-    return { price, changePercent, regularChangePercent: changePercent, prevClose: prevClose ?? price, session: marketState === 'REGULAR' ? 'regular' : 'closed', source: 'yahoo', regularPrice: regular ?? undefined };
+    return { price, changePercent, regularChangePercent: changePercent, prevClose: prevClose ?? price, session: marketState === 'REGULAR' ? 'regular' : 'closed', source: 'yahoo', regularPrice: regular ?? undefined, ...parseYahooBasics(item) };
+  }
+
+  function parseYahooBasics(item: Record<string, unknown>) {
+    return {
+      marketCap: numberValue(item.marketCap) ?? undefined,
+      trailingPE: numberValue(item.trailingPE) ?? undefined,
+      forwardPE: numberValue(item.forwardPE) ?? undefined,
+      regularMarketVolume: numberValue(item.regularMarketVolume) ?? undefined,
+      averageVolume: numberValue(item.averageVolume) ?? undefined,
+    };
   }
 
   function numberValue(value: unknown) {

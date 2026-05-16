@@ -25,6 +25,7 @@ import {
   type EarningsItem,
   type GoalConfig,
   type HistoryEntry,
+  type Price,
   type SharePayload,
   type Tab,
 } from './model';
@@ -273,7 +274,7 @@ export function AssetsView({
           onEdit={onEditGoal}
         />
       )}
-    <section className="grid gap-4 lg:grid-cols-[1fr_380px]">
+    <section className="space-y-4">
       <div className="space-y-4">
         <AssetTrendChart history={sortedHistory} krw={krw} rate={rate} benchData={benchData} />
         <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
@@ -357,10 +358,7 @@ export function AssetsView({
         </div>
       </div>
       </div>
-      <aside
-        className="space-y-4 lg:self-start xl:fixed xl:bottom-6 xl:top-24 xl:z-20 xl:w-[380px] xl:overflow-y-auto xl:pr-1"
-        style={{ right: 'max(1.5rem, calc((100vw - 1540px) / 2 + 1.5rem))' }}
-      >
+      <aside className="grid gap-4 lg:grid-cols-2">
       <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
         <h2 className="font-bold text-slate-100">자산 상태 요약</h2>
         <div className="mt-4 space-y-3 text-sm">
@@ -567,6 +565,7 @@ export function TickerDetail({
   ticker,
   theme = 'light',
   earnings = [],
+  quote,
   memo = '',
   aiInsights = [],
   onSaveMemo,
@@ -574,6 +573,7 @@ export function TickerDetail({
   ticker: string;
   theme?: 'light' | 'dark';
   earnings?: EarningsItem[];
+  quote?: Pick<Price, 'marketCap' | 'trailingPE' | 'forwardPE' | 'regularMarketVolume' | 'averageVolume'>;
   memo?: string;
   aiInsights?: AiInsightItem[];
   onSaveMemo?: (text: string) => void;
@@ -601,11 +601,7 @@ export function TickerDetail({
       </div>
       <div className="p-0">
         <iframe title={`${ticker} TradingView chart`} src={chartUrl} className="h-[360px] w-full border-0" loading="lazy" />
-        {earnings.length > 0 && (
-          <div className="border-t border-border p-4">
-            <TickerEarningsSummary ticker={ticker} earnings={earnings} />
-          </div>
-        )}
+        <TickerFundamentals quote={quote} />
         {aiInsights.length > 0 && (
           <div className="border-t border-border p-4">
             <TickerAiInsights insights={aiInsights} />
@@ -619,6 +615,43 @@ export function TickerDetail({
       </div>
     </section>
   );
+}
+
+function TickerFundamentals({ quote }: { quote?: Pick<Price, 'marketCap' | 'trailingPE' | 'forwardPE' | 'regularMarketVolume' | 'averageVolume'> }) {
+  const items = [
+    ['PER', quote?.trailingPE ? quote.trailingPE.toFixed(1) : '-'],
+    ['Forward PER', quote?.forwardPE ? quote.forwardPE.toFixed(1) : '-'],
+    ['시가총액', quote?.marketCap ? formatLargeUsd(quote.marketCap) : '-'],
+    ['거래량', quote?.regularMarketVolume ? formatCompactNumber(quote.regularMarketVolume) : '-'],
+    ['평균 거래량', quote?.averageVolume ? formatCompactNumber(quote.averageVolume) : '-'],
+  ];
+  return (
+    <div className="border-t border-border p-4">
+      <h3 className="text-sm font-bold">핵심 지표</h3>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        {items.map(([label, value]) => (
+          <div key={label} className="rounded-lg border border-border bg-bg p-3">
+            <div className="text-sub">{label}</div>
+            <div className="mt-1 font-extrabold text-text">{value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function formatLargeUsd(value: number) {
+  if (Math.abs(value) >= 1_000_000_000_000) return `$${(value / 1_000_000_000_000).toFixed(2)}T`;
+  if (Math.abs(value) >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
+  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  return usd(value);
+}
+
+function formatCompactNumber(value: number) {
+  if (Math.abs(value) >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}B`;
+  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return Math.round(value).toLocaleString('en-US');
 }
 
 function TickerAiInsights({ insights }: { insights: AiInsightItem[] }) {

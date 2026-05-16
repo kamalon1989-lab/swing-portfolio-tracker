@@ -25,6 +25,14 @@ type YahooChartResult = {
     quote?: Array<{ close?: Array<number | null> }>;
   };
 };
+type YahooQuoteItem = {
+  symbol?: string;
+  marketCap?: number;
+  trailingPE?: number;
+  forwardPE?: number;
+  regularMarketVolume?: number;
+  averageDailyVolume3Month?: number;
+};
 
 async function verify(req: NextRequest): Promise<{ uid: string } | null> {
   const auth = req.headers.get('authorization') || '';
@@ -105,6 +113,24 @@ async function fetchChartQuote(symbol: string) {
   };
 }
 
+async function fetchQuoteBasics(symbols: string[]) {
+  if (!symbols.length) return new Map<string, YahooQuoteItem>();
+  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbols.join(','))}`;
+  const upstream = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    signal: AbortSignal.timeout(10000),
+    next: { revalidate: 60 },
+  });
+  if (!upstream.ok) return new Map<string, YahooQuoteItem>();
+  const data = await upstream.json();
+  const results = (data?.quoteResponse?.result ?? []) as YahooQuoteItem[];
+  return new Map(
+    results
+      .filter((item) => item.symbol)
+      .map((item) => [String(item.symbol).toUpperCase(), item])
+  );
+}
+
 export async function GET(req: NextRequest) {
   const user = await verify(req);
   if (!user) return new Response('Unauthorized', { status: 401 });
@@ -113,9 +139,24 @@ export async function GET(req: NextRequest) {
   if (!symbols.length) return Response.json({ quotes: [] });
 
   try {
-    const quotes = await Promise.all(symbols.map((symbol) => fetchChartQuote(symbol).catch(() => null)));
+    const [quotes, basics] = await Promise.all([
+      Promise.all(symbols.map((symbol) => fetchChartQuote(symbol).catch(() => null))),
+      fetchQuoteBasics(symbols).catch(() => new Map<string, YahooQuoteItem>()),
+    ]);
     return Response.json(
-      { quotes: quotes.filter(Boolean) },
+      {
+        quotes: quotes.filter(Boolean).map((quote) => {
+          const basic = basics.get(String(quote?.symbol ?? '').toUpperCase());
+          return {
+            ...quote,
+            marketCap: basic?.marketCap,
+            trailingPE: basic?.trailingPE,
+            forwardPE: basic?.forwardPE,
+            regularMarketVolume: basic?.regularMarketVolume,
+            averageVolume: basic?.averageDailyVolume3Month,
+          };
+        }),
+      },
       {
         headers: {
           'Cache-Control': 'public, s-maxage=20, stale-while-revalidate=40',

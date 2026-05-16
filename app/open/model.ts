@@ -12,6 +12,11 @@ export type Price = {
   source?: 'yahoo' | 'finnhub' | 'demo';
   regularPrice?: number;
   extendedPrice?: number;
+  marketCap?: number;
+  trailingPE?: number;
+  forwardPE?: number;
+  regularMarketVolume?: number;
+  averageVolume?: number;
   error?: string;
 };
 export type PriceMap = Record<string, Price>;
