@@ -357,7 +357,7 @@ export function AssetsView({
         </div>
       </div>
       </div>
-      <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+      <aside className="space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
       <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
         <h2 className="font-bold text-slate-100">자산 상태 요약</h2>
         <div className="mt-4 space-y-3 text-sm">

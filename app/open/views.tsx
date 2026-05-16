@@ -285,7 +285,6 @@ export function PortfolioView(props: {
               </div>
             </button>
             <div className="mt-3 flex justify-end gap-2">
-              <button type="button" onClick={() => openMobileTicker(r.ticker)} className="rounded-md border border-border px-2 py-1 text-xs font-bold text-slate-700 dark:text-slate-200">상세</button>
               <button type="button" onClick={() => props.onEdit(r)} className="rounded-md border border-border px-2 py-1 text-xs font-bold text-brand">수정</button>
               <button type="button" onClick={() => props.onDelete(r.ticker)} className="rounded-md border border-rose-200 px-2 py-1 text-xs font-bold text-rose-600">삭제</button>
             </div>
@@ -317,7 +316,7 @@ export function PortfolioView(props: {
           </thead>
           <tbody>
             {sortedRows.map((r) => (
-              <tr key={r.ticker} className="border-t border-border hover:bg-bg">
+              <tr key={r.ticker} onClick={() => props.onSelectTicker(r.ticker)} className="cursor-pointer border-t border-border hover:bg-bg">
                 <td className="px-3 py-3 text-left">
                   <div className="flex flex-wrap items-center gap-2">
                     <strong className="text-brand">{r.ticker}</strong>
@@ -350,9 +349,8 @@ export function PortfolioView(props: {
                 <td className="px-3 py-3 text-right text-xs font-semibold"><RRCell row={r} /></td>
                 <td className="px-3 py-3 text-right">{r.weight.toFixed(1)}%</td>
                 <td className="px-3 py-3 text-right">
-                  <button onClick={() => props.onSelectTicker(r.ticker)} className="no-print mr-2 text-slate-700">상세</button>
-                  <button onClick={() => props.onEdit(r)} className="no-print mr-2 text-brand">수정</button>
-                  <button onClick={() => props.onDelete(r.ticker)} className="no-print text-rose-600">삭제</button>
+                  <button onClick={(event) => { event.stopPropagation(); props.onEdit(r); }} className="no-print mr-2 text-brand">수정</button>
+                  <button onClick={(event) => { event.stopPropagation(); props.onDelete(r.ticker); }} className="no-print text-rose-600">삭제</button>
                 </td>
               </tr>
             ))}
@@ -368,8 +366,8 @@ export function PortfolioView(props: {
         <EarningsPanel earnings={holdingEarnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
       </div>
         </div>
-        <aside className="hidden xl:block">
-          <div className="sticky top-24 space-y-4">
+        <aside className="hidden xl:block xl:self-start">
+          <div className="sticky top-20 max-h-[calc(100vh-6rem)] space-y-4 overflow-y-auto pr-1">
             <PositionPathChart row={selectedRow} />
             <TickerDetail ticker={detailTicker} theme={props.theme} earnings={holdingEarnings} memo={props.tickerMemos[detailTicker] ?? selectedRow?.note ?? ''} aiInsights={props.aiInsights.filter((item) => (item.category ?? 'portfolio') === 'portfolio' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => props.onSaveMemo(detailTicker, text) : undefined} />
             <EarningsPanel earnings={holdingEarnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
@@ -802,7 +800,7 @@ export function WatchView({
             const price = prices[w.ticker]?.price;
             const dist = (price && w.targetBuy) ? ((price - w.targetBuy) / price) * 100 : null;
             return (
-              <tr key={w.ticker} className="border-t border-border hover:bg-bg">
+              <tr key={w.ticker} onClick={() => onSelectTicker(w.ticker)} className="cursor-pointer border-t border-border hover:bg-bg">
                 <td className="px-3 py-3"><strong className="text-brand">{w.ticker}</strong><div className="text-xs text-sub">{w.name}</div></td>
                 <td className="px-3 py-3 text-right font-semibold">
                   {price ? <div className="flex flex-col items-end gap-1"><span>{usd(price)}</span><PriceSessionBadge session={prices[w.ticker]?.session} /></div> : '-'}
@@ -813,7 +811,7 @@ export function WatchView({
                 </td>
                 <td className="px-3 py-3 text-right">{prices[w.ticker] ? <PriceChangeStack quote={prices[w.ticker]} /> : '-'}</td>
                 <td className="px-3 py-3 text-sub">{w.note || '-'}</td>
-                <td className="px-3 py-3 text-right"><button onClick={() => onSelectTicker(w.ticker)} className="no-print mr-2 text-slate-700">상세</button><button onClick={() => onEdit(w)} className="no-print mr-2 text-brand">수정</button><button onClick={() => onDelete(w.ticker)} className="no-print text-rose-600">삭제</button></td>
+                <td className="px-3 py-3 text-right"><button onClick={(event) => { event.stopPropagation(); onEdit(w); }} className="no-print mr-2 text-brand">수정</button><button onClick={(event) => { event.stopPropagation(); onDelete(w.ticker); }} className="no-print text-rose-600">삭제</button></td>
               </tr>
             );
           })}</tbody>
@@ -825,8 +823,8 @@ export function WatchView({
         <EarningsPanel earnings={watchEarnings} loading={loadingEarnings} onRefresh={onRefreshEarnings} />
       </div>
         </div>
-        <aside className="hidden xl:block">
-          <div className="sticky top-24 space-y-4">
+        <aside className="hidden xl:block xl:self-start">
+          <div className="sticky top-20 max-h-[calc(100vh-6rem)] space-y-4 overflow-y-auto pr-1">
             <TickerDetail ticker={detailTicker} theme={theme} earnings={watchEarnings} memo={tickerMemos[detailTicker] ?? ''} aiInsights={aiInsights.filter((item) => item.category === 'watchlist' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => onSaveMemo(detailTicker, text) : undefined} />
             <EarningsPanel earnings={watchEarnings} loading={loadingEarnings} onRefresh={onRefreshEarnings} />
           </div>
@@ -1053,7 +1051,7 @@ export function JournalView({ journal, onAdd, onEdit, onDelete }: { journal: Jou
         {!journal.length && <div className="p-12 text-center text-sm text-sub">거래 기록이 없습니다.</div>}
       </div>
       </div>
-      <aside className="hidden xl:block">
+      <aside className="hidden xl:block xl:self-start">
         <JournalSidePanel journal={journal} onAdd={onAdd} />
       </aside>
     </section>
@@ -1065,6 +1063,10 @@ function JournalSidePanel({ journal, onAdd }: { journal: JournalItem[]; onAdd: (
   const monthItems = journal.filter((item) => item.date.startsWith(month));
   const trades = journal.filter((item) => item.action === 'buy' || item.action === 'sell');
   const sells = trades.filter((item) => item.action === 'sell');
+  const recent = [...journal].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+  const cashFlows = monthItems.filter(isCashFlowJournal);
+  const monthDeposit = cashFlows.filter((item) => item.action === 'deposit').reduce((sum, item) => sum + item.price, 0);
+  const monthWithdraw = cashFlows.filter((item) => item.action === 'withdraw').reduce((sum, item) => sum + item.price, 0);
   const buyMap: Record<string, { cost: number; shares: number }> = {};
   trades.filter((item) => item.action === 'buy').forEach((item) => {
     if (!buyMap[item.ticker]) buyMap[item.ticker] = { cost: 0, shares: 0 };
@@ -1074,26 +1076,35 @@ function JournalSidePanel({ journal, onAdd }: { journal: JournalItem[]; onAdd: (
   let realized = 0;
   let wins = 0;
   const strategy: Record<string, { pnl: number; count: number }> = {};
+  const sellReviews: Array<{ item: JournalItem; pnl: number; avg: number }> = [];
   sells.forEach((item) => {
     const buy = buyMap[item.ticker];
     const avg = buy?.shares ? buy.cost / buy.shares : item.price;
     const pnl = (item.price - avg) * item.shares - (item.fee || 0);
     realized += pnl;
     if (pnl > 0) wins += 1;
+    sellReviews.push({ item, pnl, avg });
     const key = item.strategy || '전략 없음';
     if (!strategy[key]) strategy[key] = { pnl: 0, count: 0 };
     strategy[key].pnl += pnl;
     strategy[key].count += 1;
   });
   const strategyRows = Object.entries(strategy).sort((a, b) => b[1].pnl - a[1].pnl);
-  const noMemo = journal.filter((item) => !item.note && (item.action === 'buy' || item.action === 'sell')).slice(0, 5);
+  const noMemo = trades.filter((item) => !item.note);
+  const noStrategy = trades.filter((item) => !item.strategy);
+  const tickerCounts = trades.reduce<Record<string, number>>((acc, item) => {
+    acc[item.ticker] = (acc[item.ticker] || 0) + 1;
+    return acc;
+  }, {});
+  const activeTickers = Object.entries(tickerCounts).filter(([, count]) => count >= 3).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const lossReviews = sellReviews.filter((row) => row.pnl < 0).sort((a, b) => a.pnl - b.pnl).slice(0, 3);
   return (
-    <div className="sticky top-24 space-y-4">
+    <div className="sticky top-20 max-h-[calc(100vh-6rem)] space-y-4 overflow-y-auto pr-1">
       <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="font-bold text-slate-100">매매 복기 패널</h2>
-            <p className="mt-1 text-xs text-slate-400">성과, 전략, 복기 누락을 빠르게 확인합니다.</p>
+            <p className="mt-1 text-xs text-slate-400">이번 달 성과와 바로 점검할 거래를 모았습니다.</p>
           </div>
           <button onClick={onAdd} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-white">추가</button>
         </div>
@@ -1110,6 +1121,31 @@ function JournalSidePanel({ journal, onAdd }: { journal: JournalItem[]; onAdd: (
             <div className="text-xs text-slate-400">실현 손익</div>
             <div className={`mt-1 text-xl font-extrabold ${colorClass(realized)}`}>{usd(realized)}</div>
           </div>
+          <div className="col-span-2 rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+            <div className="text-xs text-slate-400">이번 달 예수금 흐름</div>
+            <div className="mt-1 flex items-center justify-between gap-3 text-sm">
+              <span className="font-bold text-emerald-400">입금 {usd(monthDeposit)}</span>
+              <span className="font-bold text-amber-400">출금 {usd(monthWithdraw)}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+        <h3 className="font-bold text-slate-100">최근 거래</h3>
+        <div className="mt-3 space-y-2">
+          {recent.map((item) => (
+            <div key={item.id} className="rounded-xl bg-slate-900/70 p-3 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-slate-200">{item.date} · {isCashFlowJournal(item) ? '예수금' : item.ticker}</span>
+                <span className={`rounded-full px-2 py-0.5 font-bold ${journalActionClass(item.action)}`}>{journalActionLabel(item.action)}</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-2 text-slate-400">
+                <span className="truncate">{item.strategy || item.note || '전략/메모 없음'}</span>
+                <strong className={journalAmountClass(item.action)}>{usd(journalAmount(item))}</strong>
+              </div>
+            </div>
+          ))}
+          {!recent.length && <div className="rounded-xl bg-slate-900/70 p-3 text-sm text-slate-400">거래를 입력하면 최근 기록이 표시됩니다.</div>}
         </div>
       </section>
       <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
@@ -1117,7 +1153,10 @@ function JournalSidePanel({ journal, onAdd }: { journal: JournalItem[]; onAdd: (
         <div className="mt-3 space-y-2">
           {strategyRows.slice(0, 4).map(([name, stat]) => (
             <div key={name} className="flex items-center justify-between gap-3 rounded-xl bg-slate-900/70 p-3 text-sm">
-              <span className="truncate text-slate-300">{name}</span>
+              <span className="min-w-0">
+                <span className="block truncate text-slate-300">{name}</span>
+                <span className="text-xs text-slate-500">매도 {stat.count}회</span>
+              </span>
               <strong className={colorClass(stat.pnl)}>{usd(stat.pnl)}</strong>
             </div>
           ))}
@@ -1125,15 +1164,36 @@ function JournalSidePanel({ journal, onAdd }: { journal: JournalItem[]; onAdd: (
         </div>
       </section>
       <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
-        <h3 className="font-bold text-slate-100">복기 필요</h3>
+        <h3 className="font-bold text-slate-100">손실 매도 점검</h3>
         <div className="mt-3 space-y-2">
-          {noMemo.map((item) => (
+          {lossReviews.map(({ item, pnl, avg }) => (
             <div key={item.id} className="rounded-xl bg-slate-900/70 p-3 text-xs">
-              <div className="font-bold text-slate-200">{item.date} · {item.ticker} · {journalActionLabel(item.action)}</div>
-              <div className="mt-1 text-slate-400">메모가 비어 있습니다.</div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-slate-200">{item.date} · {item.ticker}</span>
+                <strong className={colorClass(pnl)}>{usd(pnl)}</strong>
+              </div>
+              <div className="mt-1 text-slate-400">평단 {usd(avg)} → 매도 {usd(item.price)}</div>
+              <div className="mt-1 line-clamp-2 text-slate-500">{item.note || '손절 이유를 메모로 남기면 다음 매매 때 참고하기 좋습니다.'}</div>
             </div>
           ))}
-          {!noMemo.length && <div className="rounded-xl bg-slate-900/70 p-3 text-sm text-slate-400">복기 누락 거래가 없습니다.</div>}
+          {!lossReviews.length && <div className="rounded-xl bg-slate-900/70 p-3 text-sm text-slate-400">손실 매도 기록이 없습니다. 수익 실현과 보유 판단에 집중하면 됩니다.</div>}
+        </div>
+      </section>
+      <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+        <h3 className="font-bold text-slate-100">체크포인트</h3>
+        <div className="mt-3 space-y-2 text-sm">
+          <div className="rounded-xl bg-slate-900/70 p-3 text-slate-300">
+            메모 없는 거래 <strong className={noMemo.length ? 'text-amber-300' : 'text-emerald-300'}>{noMemo.length}건</strong>
+          </div>
+          <div className="rounded-xl bg-slate-900/70 p-3 text-slate-300">
+            전략 태그 없는 거래 <strong className={noStrategy.length ? 'text-amber-300' : 'text-emerald-300'}>{noStrategy.length}건</strong>
+          </div>
+          <div className="rounded-xl bg-slate-900/70 p-3 text-slate-300">
+            반복 거래 티커{' '}
+            <strong className={activeTickers.length ? 'text-sky-300' : 'text-slate-500'}>
+              {activeTickers.length ? activeTickers.map(([ticker, count]) => `${ticker} ${count}회`).join(', ') : '없음'}
+            </strong>
+          </div>
         </div>
       </section>
     </div>
