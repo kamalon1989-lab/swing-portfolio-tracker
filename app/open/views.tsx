@@ -192,6 +192,7 @@ export function PortfolioView(props: {
     Array.from(holdingTickers).some((ticker) => earningsSymbolMatches(ticker, item.symbol))
   );
   const selectedRow = props.rows.find((row) => row.ticker === props.selectedTicker) ?? props.rows[0];
+  const detailTicker = props.selectedTicker || selectedRow?.ticker || '';
   const mobileRow = props.rows.find((row) => row.ticker === mobileTicker);
   const maxRiskLoss = props.rows.reduce((sum, r) => {
     if (!r.price || !r.stopLoss || r.price <= r.stopLoss) return sum;
@@ -210,7 +211,9 @@ export function PortfolioView(props: {
     setMobileTicker(ticker);
   };
   return (
-    <section className="space-y-4">
+    <section>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="space-y-4">
       <div className={`grid gap-3 ${cards.length === 6 ? 'sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6' : 'md:grid-cols-5'}`}>
         {cards.map(([label, value, sub, color]) => (
           <button key={label} type="button" onClick={label === '예수금' ? props.onEditCash : undefined} className={`rounded-xl border border-border bg-card p-4 text-left shadow-sm ${label === '예수금' ? 'cursor-pointer hover:border-brand/50' : 'cursor-default'}`}>
@@ -226,6 +229,7 @@ export function PortfolioView(props: {
         tickers={props.rows.map((row) => row.ticker)}
         onSave={props.onSaveAiInsight}
         onDelete={props.onDeleteAiInsight}
+        category="portfolio"
       />
       <div className="space-y-3 sm:hidden">
         <div className="flex items-center justify-between">
@@ -356,12 +360,21 @@ export function PortfolioView(props: {
         </table>
         {!props.rows.length && <div className="p-12 text-center text-sm text-sub">보유 종목이 없습니다.</div>}
       </div>
-      <div className="hidden gap-4 sm:grid lg:grid-cols-[1fr_360px]">
+      <div className="hidden gap-4 sm:grid xl:hidden lg:grid-cols-[1fr_360px]">
         <div className="space-y-4">
           <PositionPathChart row={selectedRow} />
-          <TickerDetail ticker={props.selectedTicker} theme={props.theme} earnings={holdingEarnings} memo={props.tickerMemos[props.selectedTicker] ?? props.rows.find((r) => r.ticker === props.selectedTicker)?.note ?? ''} aiInsights={props.aiInsights.filter((item) => item.scope === 'ticker' && item.ticker === props.selectedTicker)} onSaveMemo={props.selectedTicker ? (text) => props.onSaveMemo(props.selectedTicker, text) : undefined} />
+          <TickerDetail ticker={detailTicker} theme={props.theme} earnings={holdingEarnings} memo={props.tickerMemos[detailTicker] ?? selectedRow?.note ?? ''} aiInsights={props.aiInsights.filter((item) => (item.category ?? 'portfolio') === 'portfolio' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => props.onSaveMemo(detailTicker, text) : undefined} />
         </div>
         <EarningsPanel earnings={holdingEarnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
+      </div>
+        </div>
+        <aside className="hidden xl:block">
+          <div className="sticky top-24 space-y-4">
+            <PositionPathChart row={selectedRow} />
+            <TickerDetail ticker={detailTicker} theme={props.theme} earnings={holdingEarnings} memo={props.tickerMemos[detailTicker] ?? selectedRow?.note ?? ''} aiInsights={props.aiInsights.filter((item) => (item.category ?? 'portfolio') === 'portfolio' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => props.onSaveMemo(detailTicker, text) : undefined} />
+            <EarningsPanel earnings={holdingEarnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
+          </div>
+        </aside>
       </div>
       <MobileTickerSheet
         open={Boolean(mobileTicker)}
@@ -370,7 +383,7 @@ export function PortfolioView(props: {
         theme={props.theme}
         earnings={holdingEarnings}
         memo={mobileTicker ? props.tickerMemos[mobileTicker] ?? mobileRow?.note ?? '' : ''}
-        aiInsights={mobileTicker ? props.aiInsights.filter((item) => item.scope === 'ticker' && item.ticker === mobileTicker) : []}
+        aiInsights={mobileTicker ? props.aiInsights.filter((item) => (item.category ?? 'portfolio') === 'portfolio' && item.scope === 'ticker' && item.ticker === mobileTicker) : []}
         onSaveMemo={mobileTicker ? (text) => props.onSaveMemo(mobileTicker, text) : undefined}
         extra={mobileRow ? <PositionPathChart row={mobileRow} /> : null}
       />
@@ -477,6 +490,7 @@ function AiInsightPanel({
   tickers,
   onSave,
   onDelete,
+  category,
   panelTitle = 'ChatGPT 분석 기록',
   description = 'ChatGPT 답변을 붙여넣어 전체 포트폴리오나 티커별 메모로 보관합니다.',
 }: {
@@ -484,6 +498,7 @@ function AiInsightPanel({
   tickers: string[];
   onSave: (item: Omit<AiInsightItem, 'id'> & { id?: string }) => void;
   onDelete: (id: string) => void;
+  category: NonNullable<AiInsightItem['category']>;
   panelTitle?: string;
   description?: string;
 }) {
@@ -491,19 +506,19 @@ function AiInsightPanel({
   const [selectedInsight, setSelectedInsight] = useState<AiInsightItem | null>(null);
   const [scope, setScope] = useState<AiInsightItem['scope']>('portfolio');
   const [ticker, setTicker] = useState(tickers[0] ?? '');
-  const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const recent = insights.slice(0, 3);
+  const panelInsights = insights.filter((item) => (item.category ?? 'portfolio') === category);
+  const insightTitle = (item: AiInsightItem) => item.title || (item.ticker ? `${item.ticker} AI 분석` : category === 'watchlist' ? '관심 종목 AI 분석' : '포트폴리오 AI 분석');
   const submit = () => {
     onSave({
       date: new Date().toISOString().slice(0, 10),
+      category,
       scope,
       ticker: scope === 'ticker' ? ticker : undefined,
-      title,
+      title: '',
       content,
       source: 'ChatGPT',
     });
-    setTitle('');
     setContent('');
     setOpen(false);
   };
@@ -531,16 +546,11 @@ function AiInsightPanel({
             {scope === 'ticker' && (
               <label className="block text-xs font-bold text-slate-400">
                 티커
-                <input list="ai-insight-tickers" className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-bold uppercase text-slate-100 outline-none" value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} />
-                <datalist id="ai-insight-tickers">
-                  {tickers.map((item) => <option key={item} value={item} />)}
-                </datalist>
+                <select className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-bold text-slate-100 outline-none" value={ticker} onChange={(e) => setTicker(e.target.value)}>
+                  {tickers.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
               </label>
             )}
-            <label className="block text-xs font-bold text-slate-400">
-              제목
-              <input className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none" value={title} placeholder="예: 이번 주 리밸런싱 의견" onChange={(e) => setTitle(e.target.value)} />
-            </label>
           </div>
           <div>
             <textarea className="h-56 w-full resize-y rounded-xl border border-slate-700 bg-slate-900 p-3 text-sm leading-6 text-slate-100 outline-none" value={content} placeholder="ChatGPT 답변을 여기에 붙여넣으세요." onChange={(e) => setContent(e.target.value)} />
@@ -551,14 +561,15 @@ function AiInsightPanel({
           </div>
         </div>
       )}
-      {recent.length > 0 && (
-        <div className="mt-4 grid gap-2 md:grid-cols-3">
-          {recent.map((item) => (
+      {panelInsights.length > 0 && (
+        <div className="mt-4 max-h-80 overflow-y-auto pr-1">
+          <div className="grid gap-2 md:grid-cols-3">
+          {panelInsights.map((item) => (
             <article key={item.id} className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
               <div className="flex items-start justify-between gap-2">
                 <button type="button" onClick={() => setSelectedInsight(item)} className="min-w-0 flex-1 text-left">
                   <div className="text-[11px] font-bold text-slate-400">{item.date} · {item.ticker ?? '전체'}</div>
-                  <h3 className="mt-1 truncate text-sm font-bold text-slate-100">{item.title}</h3>
+                  <h3 className="mt-1 truncate text-sm font-bold text-slate-100">{insightTitle(item)}</h3>
                 </button>
                 <button type="button" onClick={() => onDelete(item.id)} className="text-xs font-bold text-rose-300">삭제</button>
               </div>
@@ -568,6 +579,7 @@ function AiInsightPanel({
               </button>
             </article>
           ))}
+          </div>
         </div>
       )}
       {selectedInsight && (
@@ -576,7 +588,7 @@ function AiInsightPanel({
             <div className="flex items-start justify-between gap-3 border-b border-slate-800 p-4">
               <div className="min-w-0">
                 <div className="text-xs font-bold text-slate-400">{selectedInsight.date} · {selectedInsight.ticker ?? '전체 포트폴리오'} · {selectedInsight.source ?? 'ChatGPT'}</div>
-                <h3 className="mt-1 text-lg font-extrabold text-slate-100">{selectedInsight.title}</h3>
+                <h3 className="mt-1 text-lg font-extrabold text-slate-100">{insightTitle(selectedInsight)}</h3>
               </div>
               <button type="button" onClick={() => setSelectedInsight(null)} className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-300">닫기</button>
             </div>
@@ -716,12 +728,15 @@ export function WatchView({
   const watchTickers = new Set(watch.map((item) => item.ticker));
   const watchEarnings = earnings.filter((item) => Array.from(watchTickers).some((ticker) => earningsSymbolMatches(ticker, item.symbol)));
   const alerts = makeWatchPriceAlerts(watch, prices);
+  const detailTicker = selectedTicker || watch[0]?.ticker || '';
   const openMobileTicker = (ticker: string) => {
     onSelectTicker(ticker);
     setMobileTicker(ticker);
   };
   return (
-    <section className="space-y-4">
+    <section>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="space-y-4">
       <div className="no-print flex flex-wrap gap-2">
         <button onClick={onAdd} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">관심 종목 추가</button>
         <button onClick={onExportTradingView} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">TradingView 복사</button>
@@ -733,6 +748,7 @@ export function WatchView({
           tickers={watch.map((item) => item.ticker)}
           onSave={onSaveAiInsight}
           onDelete={onDeleteAiInsight}
+          category="watchlist"
           panelTitle="관심 종목 ChatGPT 분석"
           description="관심 종목에 대한 ChatGPT 답변을 붙여넣고 티커별 분석으로 보관합니다."
         />
@@ -804,9 +820,17 @@ export function WatchView({
         </table>
         {!watch.length && <div className="p-12 text-center text-sm text-sub">관심 종목이 없습니다.</div>}
       </div>
-      <div className="hidden gap-4 sm:grid lg:grid-cols-[1fr_360px]">
-        <TickerDetail ticker={selectedTicker} theme={theme} earnings={watchEarnings} memo={tickerMemos[selectedTicker] ?? ''} aiInsights={aiInsights.filter((item) => item.scope === 'ticker' && item.ticker === selectedTicker)} onSaveMemo={selectedTicker ? (text) => onSaveMemo(selectedTicker, text) : undefined} />
+      <div className="hidden gap-4 sm:grid xl:hidden lg:grid-cols-[1fr_360px]">
+        <TickerDetail ticker={detailTicker} theme={theme} earnings={watchEarnings} memo={tickerMemos[detailTicker] ?? ''} aiInsights={aiInsights.filter((item) => item.category === 'watchlist' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => onSaveMemo(detailTicker, text) : undefined} />
         <EarningsPanel earnings={watchEarnings} loading={loadingEarnings} onRefresh={onRefreshEarnings} />
+      </div>
+        </div>
+        <aside className="hidden xl:block">
+          <div className="sticky top-24 space-y-4">
+            <TickerDetail ticker={detailTicker} theme={theme} earnings={watchEarnings} memo={tickerMemos[detailTicker] ?? ''} aiInsights={aiInsights.filter((item) => item.category === 'watchlist' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => onSaveMemo(detailTicker, text) : undefined} />
+            <EarningsPanel earnings={watchEarnings} loading={loadingEarnings} onRefresh={onRefreshEarnings} />
+          </div>
+        </aside>
       </div>
       <MobileTickerSheet
         open={Boolean(mobileTicker)}
@@ -815,7 +839,7 @@ export function WatchView({
         theme={theme}
         earnings={watchEarnings}
         memo={mobileTicker ? tickerMemos[mobileTicker] ?? '' : ''}
-        aiInsights={mobileTicker ? aiInsights.filter((item) => item.scope === 'ticker' && item.ticker === mobileTicker) : []}
+        aiInsights={mobileTicker ? aiInsights.filter((item) => item.category === 'watchlist' && item.scope === 'ticker' && item.ticker === mobileTicker) : []}
         onSaveMemo={mobileTicker ? (text) => onSaveMemo(mobileTicker, text) : undefined}
       />
     </section>
@@ -979,7 +1003,8 @@ function JournalSummary({ journal }: { journal: JournalItem[] }) {
 export function JournalView({ journal, onAdd, onEdit, onDelete }: { journal: JournalItem[]; onAdd: () => void; onEdit: (item: JournalItem) => void; onDelete: (id: string) => void }) {
   const sorted = [...journal].sort((a, b) => b.date.localeCompare(a.date));
   return (
-    <section className="space-y-4">
+    <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="space-y-4">
       <button onClick={onAdd} className="no-print rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">거래 추가</button>
       <JournalSummary journal={journal} />
       <JournalFlowChart journal={journal} />
@@ -1027,7 +1052,91 @@ export function JournalView({ journal, onAdd, onEdit, onDelete }: { journal: Jou
         </table>
         {!journal.length && <div className="p-12 text-center text-sm text-sub">거래 기록이 없습니다.</div>}
       </div>
+      </div>
+      <aside className="hidden xl:block">
+        <JournalSidePanel journal={journal} onAdd={onAdd} />
+      </aside>
     </section>
+  );
+}
+
+function JournalSidePanel({ journal, onAdd }: { journal: JournalItem[]; onAdd: () => void }) {
+  const month = new Date().toISOString().slice(0, 7);
+  const monthItems = journal.filter((item) => item.date.startsWith(month));
+  const trades = journal.filter((item) => item.action === 'buy' || item.action === 'sell');
+  const sells = trades.filter((item) => item.action === 'sell');
+  const buyMap: Record<string, { cost: number; shares: number }> = {};
+  trades.filter((item) => item.action === 'buy').forEach((item) => {
+    if (!buyMap[item.ticker]) buyMap[item.ticker] = { cost: 0, shares: 0 };
+    buyMap[item.ticker].cost += item.shares * item.price;
+    buyMap[item.ticker].shares += item.shares;
+  });
+  let realized = 0;
+  let wins = 0;
+  const strategy: Record<string, { pnl: number; count: number }> = {};
+  sells.forEach((item) => {
+    const buy = buyMap[item.ticker];
+    const avg = buy?.shares ? buy.cost / buy.shares : item.price;
+    const pnl = (item.price - avg) * item.shares - (item.fee || 0);
+    realized += pnl;
+    if (pnl > 0) wins += 1;
+    const key = item.strategy || '전략 없음';
+    if (!strategy[key]) strategy[key] = { pnl: 0, count: 0 };
+    strategy[key].pnl += pnl;
+    strategy[key].count += 1;
+  });
+  const strategyRows = Object.entries(strategy).sort((a, b) => b[1].pnl - a[1].pnl);
+  const noMemo = journal.filter((item) => !item.note && (item.action === 'buy' || item.action === 'sell')).slice(0, 5);
+  return (
+    <div className="sticky top-24 space-y-4">
+      <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-bold text-slate-100">매매 복기 패널</h2>
+            <p className="mt-1 text-xs text-slate-400">성과, 전략, 복기 누락을 빠르게 확인합니다.</p>
+          </div>
+          <button onClick={onAdd} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-white">추가</button>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+            <div className="text-xs text-slate-400">이번 달 기록</div>
+            <div className="mt-1 text-lg font-extrabold text-slate-100">{monthItems.length}건</div>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+            <div className="text-xs text-slate-400">매도 승률</div>
+            <div className={`mt-1 text-lg font-extrabold ${colorClass((sells.length ? wins / sells.length : 0) * 100 - 50)}`}>{sells.length ? `${Math.round((wins / sells.length) * 100)}%` : '-'}</div>
+          </div>
+          <div className="col-span-2 rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+            <div className="text-xs text-slate-400">실현 손익</div>
+            <div className={`mt-1 text-xl font-extrabold ${colorClass(realized)}`}>{usd(realized)}</div>
+          </div>
+        </div>
+      </section>
+      <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+        <h3 className="font-bold text-slate-100">전략별 성과</h3>
+        <div className="mt-3 space-y-2">
+          {strategyRows.slice(0, 4).map(([name, stat]) => (
+            <div key={name} className="flex items-center justify-between gap-3 rounded-xl bg-slate-900/70 p-3 text-sm">
+              <span className="truncate text-slate-300">{name}</span>
+              <strong className={colorClass(stat.pnl)}>{usd(stat.pnl)}</strong>
+            </div>
+          ))}
+          {!strategyRows.length && <div className="rounded-xl bg-slate-900/70 p-3 text-sm text-slate-400">매도 기록이 쌓이면 전략별 성과가 표시됩니다.</div>}
+        </div>
+      </section>
+      <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+        <h3 className="font-bold text-slate-100">복기 필요</h3>
+        <div className="mt-3 space-y-2">
+          {noMemo.map((item) => (
+            <div key={item.id} className="rounded-xl bg-slate-900/70 p-3 text-xs">
+              <div className="font-bold text-slate-200">{item.date} · {item.ticker} · {journalActionLabel(item.action)}</div>
+              <div className="mt-1 text-slate-400">메모가 비어 있습니다.</div>
+            </div>
+          ))}
+          {!noMemo.length && <div className="rounded-xl bg-slate-900/70 p-3 text-sm text-slate-400">복기 누락 거래가 없습니다.</div>}
+        </div>
+      </section>
+    </div>
   );
 }
 

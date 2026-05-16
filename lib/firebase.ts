@@ -100,6 +100,7 @@ export interface JournalItem {
 export interface AiInsightItem {
   id: string;
   date: string;
+  category?: 'portfolio' | 'watchlist';
   scope: 'portfolio' | 'ticker';
   ticker?: string;
   title: string;

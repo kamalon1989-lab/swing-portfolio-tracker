@@ -255,6 +255,12 @@ export function AssetsView({
     },
   ].filter((row) => row.value > 0);
   const sortedHistory = [...history].sort((a, b) => a.date.localeCompare(b.date));
+  const latestHistory = sortedHistory[sortedHistory.length - 1];
+  const prevHistory = sortedHistory[sortedHistory.length - 2];
+  const latestChangePct = latestHistory && prevHistory?.totalValue ? ((latestHistory.totalValue - prevHistory.totalValue) / prevHistory.totalValue) * 100 : null;
+  const topHolding = rows.slice().sort((a, b) => b.value - a.value)[0];
+  const stockWeight = summary.totalAsset ? (summary.stockValue / summary.totalAsset) * 100 : 0;
+  const cashWeight = summary.totalAsset ? (cash / summary.totalAsset) * 100 : 0;
   return (
     <div className="space-y-4">
       {onEditGoal && (
@@ -351,6 +357,42 @@ export function AssetsView({
         </div>
       </div>
       </div>
+      <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+      <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+        <h2 className="font-bold text-slate-100">자산 상태 요약</h2>
+        <div className="mt-4 space-y-3 text-sm">
+          <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+            <div className="text-xs font-bold text-slate-400">총자산</div>
+            <div className="mt-1 text-xl font-extrabold text-slate-100">{money(summary.totalAsset, krw, rate)}</div>
+            <div className={`mt-1 text-xs font-bold ${latestChangePct === null ? 'text-slate-500' : colorClass(latestChangePct)}`}>
+              최근 기록 대비 {latestChangePct === null ? '-' : pct(latestChangePct)}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+              <div className="text-xs text-slate-400">주식 비중</div>
+              <div className="mt-1 font-extrabold text-sky-300">{stockWeight.toFixed(1)}%</div>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+              <div className="text-xs text-slate-400">현금 비중</div>
+              <div className="mt-1 font-extrabold text-amber-300">{cashWeight.toFixed(1)}%</div>
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+            <div className="text-xs text-slate-400">최대 보유</div>
+            <div className="mt-1 flex items-center justify-between gap-3">
+              <strong className="text-slate-100">{topHolding?.ticker ?? '-'}</strong>
+              <span className="text-sm font-bold text-slate-300">{topHolding && summary.totalAsset ? ((topHolding.value / summary.totalAsset) * 100).toFixed(1) : '0.0'}%</span>
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+            <div className="text-xs text-slate-400">다음 행동</div>
+            <div className="mt-2 text-xs leading-5 text-slate-300">
+              {cashWeight < 10 ? '현금 비중이 낮습니다. 다음 매수 전 예수금 여유를 확인하세요.' : cashWeight > 35 ? '현금 비중이 높습니다. 관심 종목 진입 조건을 점검해도 좋습니다.' : '현금과 주식 비중이 비교적 균형 구간입니다.'}
+            </div>
+          </div>
+        </div>
+      </div>
       <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -382,6 +424,7 @@ export function AssetsView({
           <div className="flex justify-between border-t border-slate-800 pt-2 text-slate-400"><span>총 자산</span><strong className="text-slate-100">{money(summary.totalAsset, krw, rate)}</strong></div>
         </div>
       </div>
+      </aside>
     </section>
     </div>
   );

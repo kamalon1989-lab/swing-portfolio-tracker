@@ -239,7 +239,7 @@ export default function OpenPage() {
           </div>
         </section>
       ) : (
-        <div className="mx-auto max-w-7xl px-4 pb-28 pt-5 sm:pb-5">
+        <div className="mx-auto max-w-[1540px] px-4 pb-28 pt-5 sm:pb-5">
           <MobileTabs tab={tab} setTab={setTab} />
           {tab === 'portfolio' && (
             <PortfolioView

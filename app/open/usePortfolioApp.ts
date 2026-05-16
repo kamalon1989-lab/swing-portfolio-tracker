@@ -824,8 +824,9 @@ export function usePortfolioApp() {
 
   function saveAiInsight(item: Omit<AiInsightItem, 'id'> & { id?: string }) {
     const ticker = item.scope === 'ticker' ? normalizeTicker(item.ticker ?? '') : '';
-    const title = item.title.trim() || (ticker ? `${ticker} AI 분석` : '포트폴리오 AI 분석');
     const content = item.content.trim();
+    const category = item.category ?? 'portfolio';
+    const title = item.title?.trim() || (ticker ? `${ticker} AI 분석` : category === 'watchlist' ? '관심 종목 AI 분석' : '포트폴리오 AI 분석');
     if (!content) {
       notify('저장할 ChatGPT 답변을 붙여넣어 주세요');
       return;
@@ -837,6 +838,7 @@ export function usePortfolioApp() {
     const next: AiInsightItem = {
       id: item.id || uid(),
       date: item.date || today(),
+      category,
       scope: item.scope,
       ticker: ticker || undefined,
       title,
