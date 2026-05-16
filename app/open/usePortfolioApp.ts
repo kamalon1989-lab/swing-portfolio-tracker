@@ -372,6 +372,18 @@ export function usePortfolioApp() {
         if (parsed) next[ticker] = parsed;
         else missing.push(ticker);
       }
+      const metricResults = await Promise.all(
+        tickers.map((ticker) =>
+          fetchFinnhubJson('stock/metric', { symbol: ticker, metric: 'all' })
+            .then((data) => ({ ticker, metrics: parseFinnhubMetrics(data) }))
+            .catch(() => ({ ticker, metrics: {} }))
+        )
+      );
+      for (const { ticker, metrics } of metricResults) {
+        if (Object.keys(metrics).length) {
+          next[ticker] = { ...(next[ticker] ?? { price: 0, session: 'closed' as const }), ...metrics };
+        }
+      }
       if (missing.length) {
         const fallbackResults = await Promise.all(
           missing.map((ticker) =>
@@ -384,7 +396,7 @@ export function usePortfolioApp() {
           )
         );
         for (const { ticker, data } of fallbackResults) {
-          if (data?.c) next[ticker] = { price: data.c, changePercent: data.dp ?? 0, regularChangePercent: data.dp ?? 0, prevClose: data.pc ?? data.c, session: 'regular', source: 'finnhub' };
+          if (data?.c) next[ticker] = { ...next[ticker], price: data.c, changePercent: data.dp ?? 0, regularChangePercent: data.dp ?? 0, prevClose: data.pc ?? data.c, session: 'regular', source: 'finnhub' };
         }
       }
       setPrices(next);
@@ -441,6 +453,26 @@ export function usePortfolioApp() {
       forwardPE: numberValue(item.forwardPE) ?? undefined,
       regularMarketVolume: numberValue(item.regularMarketVolume) ?? undefined,
       averageVolume: numberValue(item.averageVolume) ?? undefined,
+    };
+  }
+
+  function parseFinnhubMetrics(raw: unknown): Partial<Price> {
+    if (!raw || typeof raw !== 'object') return {};
+    const metric = (raw as { metric?: Record<string, unknown> }).metric;
+    if (!metric || typeof metric !== 'object') return {};
+    const marketCapMillion = numberValue(metric.marketCapitalization);
+    const avg10DayVolumeMillion = numberValue(metric['10DayAverageTradingVolume']);
+    const avg3MonthVolumeMillion = numberValue(metric['3MonthAverageTradingVolume']);
+    return {
+      marketCap: marketCapMillion ? marketCapMillion * 1_000_000 : undefined,
+      trailingPE: numberValue(metric.peTTM) ?? numberValue(metric.peBasicExclExtraTTM) ?? numberValue(metric.peNormalizedAnnual) ?? undefined,
+      forwardPE: numberValue(metric.peForward) ?? undefined,
+      regularMarketVolume: numberValue(metric.volume) ?? undefined,
+      averageVolume: avg10DayVolumeMillion
+        ? avg10DayVolumeMillion * 1_000_000
+        : avg3MonthVolumeMillion
+          ? avg3MonthVolumeMillion * 1_000_000
+          : undefined,
     };
   }
 
