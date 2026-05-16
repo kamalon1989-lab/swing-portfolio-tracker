@@ -387,16 +387,16 @@ export function PortfolioView(props: {
       </div>
       <div className="hidden gap-4 sm:grid xl:hidden lg:grid-cols-[1fr_360px]">
         <div className="space-y-4">
-          <PositionPathChart row={selectedRow} />
           <TickerDetail ticker={detailTicker} theme={props.theme} quote={selectedRow} memo={props.tickerMemos[detailTicker] ?? selectedRow?.note ?? ''} aiInsights={props.aiInsights.filter((item) => (item.category ?? 'portfolio') === 'portfolio' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => props.onSaveMemo(detailTicker, text) : undefined} />
+          <PositionPathChart row={selectedRow} />
         </div>
       </div>
       <EarningsPanel earnings={holdingEarnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
         </div>
         <aside className="hidden xl:block xl:self-start">
           <DesktopSidePanel width={400}>
-            <PositionPathChart row={selectedRow} />
             <TickerDetail ticker={detailTicker} theme={props.theme} quote={selectedRow} memo={props.tickerMemos[detailTicker] ?? selectedRow?.note ?? ''} aiInsights={props.aiInsights.filter((item) => (item.category ?? 'portfolio') === 'portfolio' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => props.onSaveMemo(detailTicker, text) : undefined} />
+            <PositionPathChart row={selectedRow} />
           </DesktopSidePanel>
         </aside>
       </div>
@@ -405,6 +405,7 @@ export function PortfolioView(props: {
         onClose={() => setMobileTicker('')}
         ticker={mobileTicker}
         theme={props.theme}
+        quote={mobileRow}
         earnings={holdingEarnings}
         memo={mobileTicker ? props.tickerMemos[mobileTicker] ?? mobileRow?.note ?? '' : ''}
         aiInsights={mobileTicker ? props.aiInsights.filter((item) => (item.category ?? 'portfolio') === 'portfolio' && item.scope === 'ticker' && item.ticker === mobileTicker) : []}
@@ -468,6 +469,7 @@ function MobileTickerSheet({
   onClose,
   ticker,
   theme,
+  quote,
   earnings,
   memo,
   aiInsights = [],
@@ -478,6 +480,7 @@ function MobileTickerSheet({
   onClose: () => void;
   ticker: string;
   theme: 'light' | 'dark';
+  quote?: Pick<Price, 'marketCap' | 'trailingPE' | 'forwardPE' | 'regularMarketVolume' | 'averageVolume'>;
   earnings: EarningsItem[];
   memo: string;
   aiInsights?: AiInsightItem[];
@@ -501,8 +504,8 @@ function MobileTickerSheet({
           <button onClick={onClose} className="rounded-full border border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-300">닫기</button>
         </div>
         <div className="space-y-3">
+          <TickerDetail ticker={ticker} theme={theme} earnings={earnings} quote={quote} memo={memo} aiInsights={aiInsights} onSaveMemo={onSaveMemo} />
           {extra}
-          <TickerDetail ticker={ticker} theme={theme} earnings={earnings} memo={memo} aiInsights={aiInsights} onSaveMemo={onSaveMemo} />
         </div>
       </section>
     </div>
@@ -860,6 +863,7 @@ export function WatchView({
         onClose={() => setMobileTicker('')}
         ticker={mobileTicker}
         theme={theme}
+        quote={mobileTicker ? prices[mobileTicker] : undefined}
         earnings={watchEarnings}
         memo={mobileTicker ? tickerMemos[mobileTicker] ?? '' : ''}
         aiInsights={mobileTicker ? aiInsights.filter((item) => item.category === 'watchlist' && item.scope === 'ticker' && item.ticker === mobileTicker) : []}

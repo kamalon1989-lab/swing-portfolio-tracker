@@ -445,6 +445,10 @@ export function usePortfolioApp() {
   }
 
   function numberValue(value: unknown) {
+    if (value && typeof value === 'object' && 'raw' in value) {
+      const raw = (value as { raw?: unknown }).raw;
+      return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
+    }
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
   }
 

@@ -33,6 +33,15 @@ type YahooQuoteItem = {
   regularMarketVolume?: number;
   averageDailyVolume3Month?: number;
 };
+type YahooRawValue = number | { raw?: number; fmt?: string } | undefined | null;
+type YahooSummaryItem = {
+  symbol: string;
+  marketCap?: number;
+  trailingPE?: number;
+  forwardPE?: number;
+  regularMarketVolume?: number;
+  averageVolume?: number;
+};
 
 async function verify(req: NextRequest): Promise<{ uid: string } | null> {
   const auth = req.headers.get('authorization') || '';
@@ -131,6 +140,46 @@ async function fetchQuoteBasics(symbols: string[]) {
   );
 }
 
+function rawNumber(value: YahooRawValue) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (value && typeof value === 'object' && typeof value.raw === 'number' && Number.isFinite(value.raw)) return value.raw;
+  return undefined;
+}
+
+async function fetchQuoteSummary(symbol: string): Promise<YahooSummaryItem | null> {
+  const modules = 'price,summaryDetail,defaultKeyStatistics';
+  const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=${modules}`;
+  const upstream = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    signal: AbortSignal.timeout(10000),
+    next: { revalidate: 300 },
+  });
+  if (!upstream.ok) return null;
+  const data = await upstream.json();
+  const result = data?.quoteSummary?.result?.[0];
+  if (!result) return null;
+  const price = result.price ?? {};
+  const detail = result.summaryDetail ?? {};
+  const stats = result.defaultKeyStatistics ?? {};
+  return {
+    symbol: String(price.symbol ?? symbol).toUpperCase(),
+    marketCap: rawNumber(price.marketCap) ?? rawNumber(stats.enterpriseValue),
+    trailingPE: rawNumber(detail.trailingPE) ?? rawNumber(stats.trailingPE),
+    forwardPE: rawNumber(detail.forwardPE) ?? rawNumber(stats.forwardPE),
+    regularMarketVolume: rawNumber(price.regularMarketVolume) ?? rawNumber(detail.volume),
+    averageVolume: rawNumber(detail.averageVolume) ?? rawNumber(detail.averageDailyVolume3Month),
+  };
+}
+
+async function fetchQuoteSummaries(symbols: string[]) {
+  const entries = await Promise.all(symbols.map((symbol) => fetchQuoteSummary(symbol).catch(() => null)));
+  return new Map(
+    entries
+      .filter((item): item is YahooSummaryItem => Boolean(item?.symbol))
+      .map((item) => [item.symbol.toUpperCase(), item])
+  );
+}
+
 export async function GET(req: NextRequest) {
   const user = await verify(req);
   if (!user) return new Response('Unauthorized', { status: 401 });
@@ -139,21 +188,23 @@ export async function GET(req: NextRequest) {
   if (!symbols.length) return Response.json({ quotes: [] });
 
   try {
-    const [quotes, basics] = await Promise.all([
+    const [quotes, basics, summaries] = await Promise.all([
       Promise.all(symbols.map((symbol) => fetchChartQuote(symbol).catch(() => null))),
       fetchQuoteBasics(symbols).catch(() => new Map<string, YahooQuoteItem>()),
+      fetchQuoteSummaries(symbols).catch(() => new Map<string, YahooSummaryItem>()),
     ]);
     return Response.json(
       {
         quotes: quotes.filter(Boolean).map((quote) => {
           const basic = basics.get(String(quote?.symbol ?? '').toUpperCase());
+          const summary = summaries.get(String(quote?.symbol ?? '').toUpperCase());
           return {
             ...quote,
-            marketCap: basic?.marketCap,
-            trailingPE: basic?.trailingPE,
-            forwardPE: basic?.forwardPE,
-            regularMarketVolume: basic?.regularMarketVolume,
-            averageVolume: basic?.averageDailyVolume3Month,
+            marketCap: basic?.marketCap ?? summary?.marketCap,
+            trailingPE: basic?.trailingPE ?? summary?.trailingPE,
+            forwardPE: basic?.forwardPE ?? summary?.forwardPE,
+            regularMarketVolume: basic?.regularMarketVolume ?? summary?.regularMarketVolume,
+            averageVolume: basic?.averageDailyVolume3Month ?? summary?.averageVolume,
           };
         }),
       },
