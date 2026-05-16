@@ -367,7 +367,10 @@ export function PortfolioView(props: {
       </div>
         </div>
         <aside className="hidden xl:block xl:self-start">
-          <div className="sticky top-20 max-h-[calc(100vh-6rem)] space-y-4 overflow-y-auto pr-1">
+          <div
+            className="fixed bottom-6 top-24 z-20 w-[380px] space-y-4 overflow-y-auto pr-1"
+            style={{ right: 'max(1.5rem, calc((100vw - 1540px) / 2 + 1.5rem))' }}
+          >
             <PositionPathChart row={selectedRow} />
             <TickerDetail ticker={detailTicker} theme={props.theme} earnings={holdingEarnings} memo={props.tickerMemos[detailTicker] ?? selectedRow?.note ?? ''} aiInsights={props.aiInsights.filter((item) => (item.category ?? 'portfolio') === 'portfolio' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => props.onSaveMemo(detailTicker, text) : undefined} />
             <EarningsPanel earnings={holdingEarnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
@@ -824,7 +827,10 @@ export function WatchView({
       </div>
         </div>
         <aside className="hidden xl:block xl:self-start">
-          <div className="sticky top-20 max-h-[calc(100vh-6rem)] space-y-4 overflow-y-auto pr-1">
+          <div
+            className="fixed bottom-6 top-24 z-20 w-[380px] space-y-4 overflow-y-auto pr-1"
+            style={{ right: 'max(1.5rem, calc((100vw - 1540px) / 2 + 1.5rem))' }}
+          >
             <TickerDetail ticker={detailTicker} theme={theme} earnings={watchEarnings} memo={tickerMemos[detailTicker] ?? ''} aiInsights={aiInsights.filter((item) => item.category === 'watchlist' && item.scope === 'ticker' && item.ticker === detailTicker)} onSaveMemo={detailTicker ? (text) => onSaveMemo(detailTicker, text) : undefined} />
             <EarningsPanel earnings={watchEarnings} loading={loadingEarnings} onRefresh={onRefreshEarnings} />
           </div>
@@ -1099,7 +1105,10 @@ function JournalSidePanel({ journal, onAdd }: { journal: JournalItem[]; onAdd: (
   const activeTickers = Object.entries(tickerCounts).filter(([, count]) => count >= 3).sort((a, b) => b[1] - a[1]).slice(0, 3);
   const lossReviews = sellReviews.filter((row) => row.pnl < 0).sort((a, b) => a.pnl - b.pnl).slice(0, 3);
   return (
-    <div className="sticky top-20 max-h-[calc(100vh-6rem)] space-y-4 overflow-y-auto pr-1">
+    <div
+      className="fixed bottom-6 top-24 z-20 w-[360px] space-y-4 overflow-y-auto pr-1"
+      style={{ right: 'max(1.5rem, calc((100vw - 1540px) / 2 + 1.5rem))' }}
+    >
       <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
