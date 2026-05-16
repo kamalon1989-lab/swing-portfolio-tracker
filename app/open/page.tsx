@@ -100,7 +100,10 @@ export default function OpenPage() {
     loadingEarnings,
     sharePayload,
     tickerMemos,
+    aiInsights,
     saveTickerMemo,
+    saveAiInsight,
+    deleteAiInsight,
     benchData,
     pdfPayload,
     rows,
@@ -257,6 +260,9 @@ export default function OpenPage() {
               onRefreshEarnings={refreshEarnings}
               tickerMemos={tickerMemos}
               onSaveMemo={saveTickerMemo}
+              aiInsights={aiInsights}
+              onSaveAiInsight={saveAiInsight}
+              onDeleteAiInsight={deleteAiInsight}
             />
           )}
           {tab === 'assets' && (
@@ -289,6 +295,7 @@ export default function OpenPage() {
               onRefreshEarnings={refreshEarnings}
               tickerMemos={tickerMemos}
               onSaveMemo={saveTickerMemo}
+              aiInsights={aiInsights}
               onExportTradingView={() => {
                 const text = watch.map((item) => item.ticker).filter(Boolean).join(',');
                 if (!text) {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import type { AiInsightItem } from '@/lib/firebase';
 import {
   Area,
   AreaChart,
@@ -521,12 +522,14 @@ export function TickerDetail({
   theme = 'light',
   earnings = [],
   memo = '',
+  aiInsights = [],
   onSaveMemo,
 }: {
   ticker: string;
   theme?: 'light' | 'dark';
   earnings?: EarningsItem[];
   memo?: string;
+  aiInsights?: AiInsightItem[];
   onSaveMemo?: (text: string) => void;
 }) {
   if (!ticker) {
@@ -557,6 +560,11 @@ export function TickerDetail({
             <TickerEarningsSummary ticker={ticker} earnings={earnings} />
           </div>
         )}
+        {aiInsights.length > 0 && (
+          <div className="border-t border-border p-4">
+            <TickerAiInsights insights={aiInsights} />
+          </div>
+        )}
         {onSaveMemo && (
           <div className="border-t border-border p-4">
             <TickerMemo memo={memo} onSave={onSaveMemo} />
@@ -564,6 +572,28 @@ export function TickerDetail({
         )}
       </div>
     </section>
+  );
+}
+
+function TickerAiInsights({ insights }: { insights: AiInsightItem[] }) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="text-sm font-bold">ChatGPT 분석</h3>
+        <span className="text-xs text-sub">{insights.length}개</span>
+      </div>
+      <div className="space-y-2">
+        {insights.slice(0, 3).map((item) => (
+          <article key={item.id} className="rounded-lg border border-border bg-bg p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h4 className="text-sm font-bold">{item.title}</h4>
+              <span className="text-[11px] font-semibold text-sub">{item.date}</span>
+            </div>
+            <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-sub">{item.content}</p>
+          </article>
+        ))}
+      </div>
+    </div>
   );
 }
 

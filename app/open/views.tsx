@@ -15,7 +15,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { HoldingItem, JournalItem, WatchItem } from '@/lib/firebase';
+import type { AiInsightItem, HoldingItem, JournalItem, WatchItem } from '@/lib/firebase';
 import { EarningsPanel, TickerDetail } from './panels';
 import {
   colorClass,
@@ -161,6 +161,9 @@ export function PortfolioView(props: {
   onRefreshEarnings: () => void;
   tickerMemos: Record<string, string>;
   onSaveMemo: (ticker: string, text: string) => void;
+  aiInsights: AiInsightItem[];
+  onSaveAiInsight: (item: Omit<AiInsightItem, 'id'> & { id?: string }) => void;
+  onDeleteAiInsight: (id: string) => void;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('value');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -218,6 +221,12 @@ export function PortfolioView(props: {
         ))}
       </div>
       <PriceAlerts alerts={alerts} />
+      <AiInsightPanel
+        insights={props.aiInsights}
+        tickers={props.rows.map((row) => row.ticker)}
+        onSave={props.onSaveAiInsight}
+        onDelete={props.onDeleteAiInsight}
+      />
       <div className="space-y-3 sm:hidden">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold">보유 종목</h2>
@@ -350,7 +359,7 @@ export function PortfolioView(props: {
       <div className="hidden gap-4 sm:grid lg:grid-cols-[1fr_360px]">
         <div className="space-y-4">
           <PositionPathChart row={selectedRow} />
-          <TickerDetail ticker={props.selectedTicker} theme={props.theme} earnings={holdingEarnings} memo={props.tickerMemos[props.selectedTicker] ?? props.rows.find((r) => r.ticker === props.selectedTicker)?.note ?? ''} onSaveMemo={props.selectedTicker ? (text) => props.onSaveMemo(props.selectedTicker, text) : undefined} />
+          <TickerDetail ticker={props.selectedTicker} theme={props.theme} earnings={holdingEarnings} memo={props.tickerMemos[props.selectedTicker] ?? props.rows.find((r) => r.ticker === props.selectedTicker)?.note ?? ''} aiInsights={props.aiInsights.filter((item) => item.scope === 'ticker' && item.ticker === props.selectedTicker)} onSaveMemo={props.selectedTicker ? (text) => props.onSaveMemo(props.selectedTicker, text) : undefined} />
         </div>
         <EarningsPanel earnings={holdingEarnings} loading={props.loadingEarnings} onRefresh={props.onRefreshEarnings} />
       </div>
@@ -361,6 +370,7 @@ export function PortfolioView(props: {
         theme={props.theme}
         earnings={holdingEarnings}
         memo={mobileTicker ? props.tickerMemos[mobileTicker] ?? mobileRow?.note ?? '' : ''}
+        aiInsights={mobileTicker ? props.aiInsights.filter((item) => item.scope === 'ticker' && item.ticker === mobileTicker) : []}
         onSaveMemo={mobileTicker ? (text) => props.onSaveMemo(mobileTicker, text) : undefined}
         extra={mobileRow ? <PositionPathChart row={mobileRow} /> : null}
       />
@@ -423,6 +433,7 @@ function MobileTickerSheet({
   theme,
   earnings,
   memo,
+  aiInsights = [],
   onSaveMemo,
   extra,
 }: {
@@ -432,6 +443,7 @@ function MobileTickerSheet({
   theme: 'light' | 'dark';
   earnings: EarningsItem[];
   memo: string;
+  aiInsights?: AiInsightItem[];
   onSaveMemo?: (text: string) => void;
   extra?: ReactNode;
 }) {
@@ -453,10 +465,104 @@ function MobileTickerSheet({
         </div>
         <div className="space-y-3">
           {extra}
-          <TickerDetail ticker={ticker} theme={theme} earnings={earnings} memo={memo} onSaveMemo={onSaveMemo} />
+          <TickerDetail ticker={ticker} theme={theme} earnings={earnings} memo={memo} aiInsights={aiInsights} onSaveMemo={onSaveMemo} />
         </div>
       </section>
     </div>
+  );
+}
+
+function AiInsightPanel({
+  insights,
+  tickers,
+  onSave,
+  onDelete,
+}: {
+  insights: AiInsightItem[];
+  tickers: string[];
+  onSave: (item: Omit<AiInsightItem, 'id'> & { id?: string }) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [scope, setScope] = useState<AiInsightItem['scope']>('portfolio');
+  const [ticker, setTicker] = useState(tickers[0] ?? '');
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const recent = insights.slice(0, 3);
+  const submit = () => {
+    onSave({
+      date: new Date().toISOString().slice(0, 10),
+      scope,
+      ticker: scope === 'ticker' ? ticker : undefined,
+      title,
+      content,
+      source: 'ChatGPT',
+    });
+    setTitle('');
+    setContent('');
+    setOpen(false);
+  };
+  return (
+    <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-bold text-slate-100">ChatGPT 분석 기록</h2>
+          <p className="mt-1 text-xs text-slate-400">ChatGPT 답변을 붙여넣어 전체 포트폴리오나 티커별 메모로 보관합니다.</p>
+        </div>
+        <button type="button" onClick={() => setOpen((value) => !value)} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">
+          {open ? '닫기' : '답변 붙여넣기'}
+        </button>
+      </div>
+      {open && (
+        <div className="mt-4 grid gap-3 md:grid-cols-[180px_1fr]">
+          <div className="space-y-3">
+            <label className="block text-xs font-bold text-slate-400">
+              저장 위치
+              <select className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none" value={scope} onChange={(e) => setScope(e.target.value as AiInsightItem['scope'])}>
+                <option value="portfolio">전체 포트폴리오</option>
+                <option value="ticker">특정 티커</option>
+              </select>
+            </label>
+            {scope === 'ticker' && (
+              <label className="block text-xs font-bold text-slate-400">
+                티커
+                <input list="ai-insight-tickers" className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-bold uppercase text-slate-100 outline-none" value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} />
+                <datalist id="ai-insight-tickers">
+                  {tickers.map((item) => <option key={item} value={item} />)}
+                </datalist>
+              </label>
+            )}
+            <label className="block text-xs font-bold text-slate-400">
+              제목
+              <input className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none" value={title} placeholder="예: 이번 주 리밸런싱 의견" onChange={(e) => setTitle(e.target.value)} />
+            </label>
+          </div>
+          <div>
+            <textarea className="h-56 w-full resize-y rounded-xl border border-slate-700 bg-slate-900 p-3 text-sm leading-6 text-slate-100 outline-none" value={content} placeholder="ChatGPT 답변을 여기에 붙여넣으세요." onChange={(e) => setContent(e.target.value)} />
+            <div className="mt-2 flex justify-end gap-2">
+              <button type="button" onClick={() => setContent('')} className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-bold text-slate-300">비우기</button>
+              <button type="button" onClick={submit} disabled={!content.trim()} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white disabled:opacity-40">저장</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {recent.length > 0 && (
+        <div className="mt-4 grid gap-2 md:grid-cols-3">
+          {recent.map((item) => (
+            <article key={item.id} className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-bold text-slate-400">{item.date} · {item.ticker ?? '전체'}</div>
+                  <h3 className="mt-1 truncate text-sm font-bold text-slate-100">{item.title}</h3>
+                </div>
+                <button type="button" onClick={() => onDelete(item.id)} className="text-xs font-bold text-rose-300">삭제</button>
+              </div>
+              <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-xs leading-5 text-slate-400">{item.content}</p>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -560,6 +666,7 @@ export function WatchView({
   onExportTradingView,
   tickerMemos,
   onSaveMemo,
+  aiInsights = [],
 }: {
   watch: WatchItem[];
   prices: PriceMap;
@@ -575,6 +682,7 @@ export function WatchView({
   onExportTradingView: () => void;
   tickerMemos: Record<string, string>;
   onSaveMemo: (ticker: string, text: string) => void;
+  aiInsights?: AiInsightItem[];
 }) {
   const [mobileTicker, setMobileTicker] = useState('');
   const watchTickers = new Set(watch.map((item) => item.ticker));
@@ -659,7 +767,7 @@ export function WatchView({
         {!watch.length && <div className="p-12 text-center text-sm text-sub">관심 종목이 없습니다.</div>}
       </div>
       <div className="hidden gap-4 sm:grid lg:grid-cols-[1fr_360px]">
-        <TickerDetail ticker={selectedTicker} theme={theme} earnings={watchEarnings} memo={tickerMemos[selectedTicker] ?? ''} onSaveMemo={selectedTicker ? (text) => onSaveMemo(selectedTicker, text) : undefined} />
+        <TickerDetail ticker={selectedTicker} theme={theme} earnings={watchEarnings} memo={tickerMemos[selectedTicker] ?? ''} aiInsights={aiInsights.filter((item) => item.scope === 'ticker' && item.ticker === selectedTicker)} onSaveMemo={selectedTicker ? (text) => onSaveMemo(selectedTicker, text) : undefined} />
         <EarningsPanel earnings={watchEarnings} loading={loadingEarnings} onRefresh={onRefreshEarnings} />
       </div>
       <MobileTickerSheet
@@ -669,6 +777,7 @@ export function WatchView({
         theme={theme}
         earnings={watchEarnings}
         memo={mobileTicker ? tickerMemos[mobileTicker] ?? '' : ''}
+        aiInsights={mobileTicker ? aiInsights.filter((item) => item.scope === 'ticker' && item.ticker === mobileTicker) : []}
         onSaveMemo={mobileTicker ? (text) => onSaveMemo(mobileTicker, text) : undefined}
       />
     </section>
@@ -972,27 +1081,41 @@ export function PaperTradingView({
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <button onClick={onAddAccount} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">계좌 추가</button>
-        <button onClick={onAddTrade} disabled={!accounts.length} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-40">거래 추가</button>
-        <button onClick={() => selected && onExport(selected.account.id)} disabled={!selected} className="rounded-lg border border-border px-3 py-2 text-sm font-bold disabled:opacity-40">선택 계좌 내보내기</button>
-        <button onClick={onClonePortfolio} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">현재 포트폴리오 복사</button>
-        <button onClick={() => setShowPrompt((v) => !v)} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">AI 입력 예시</button>
-        <button onClick={() => setShowPasteImport((v) => !v)} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">JSON 붙여넣기</button>
-        <label className="cursor-pointer rounded-lg border border-border px-3 py-2 text-sm font-bold">
-          모의 가져오기
-          <input
-            key={importKey}
-            type="file"
-            accept="application/json"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onImport(file);
-              setImportKey((v) => v + 1);
-            }}
-          />
-        </label>
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-extrabold">모의투자</h2>
+            <p className="mt-1 text-xs text-sub">계좌별로 실계좌와 분리해서 투자 아이디어를 기록합니다.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={onAddTrade} disabled={!accounts.length} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white disabled:opacity-40">거래 추가</button>
+            <button onClick={onAddAccount} className="rounded-lg border border-border px-3 py-2 text-sm font-bold">계좌 추가</button>
+          </div>
+        </div>
+
+        <details className="mt-3 rounded-xl border border-border bg-bg">
+          <summary className="cursor-pointer px-3 py-2 text-sm font-bold text-sub">데이터 관리</summary>
+          <div className="grid gap-2 border-t border-border p-3 sm:grid-cols-2 lg:grid-cols-5">
+            <button onClick={() => selected && onExport(selected.account.id)} disabled={!selected} className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-bold disabled:opacity-40">계좌 내보내기</button>
+            <label className="cursor-pointer rounded-lg border border-border bg-card px-3 py-2 text-center text-sm font-bold">
+              파일 가져오기
+              <input
+                key={importKey}
+                type="file"
+                accept="application/json"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onImport(file);
+                  setImportKey((v) => v + 1);
+                }}
+              />
+            </label>
+            <button onClick={() => setShowPasteImport((v) => !v)} className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-bold">JSON 붙여넣기</button>
+            <button onClick={() => setShowPrompt((v) => !v)} className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-bold">AI 입력 예시</button>
+            <button onClick={onClonePortfolio} className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-bold">실계좌 복사</button>
+          </div>
+        </details>
       </div>
 
       {showPrompt && (
@@ -1019,7 +1142,7 @@ export function PaperTradingView({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="font-bold">모의투자 JSON 붙여넣기</h3>
-              <p className="mt-1 text-xs text-sub">GPT가 만든 JSON을 그대로 붙여넣고 불러오면 됩니다. 기존 모의투자 데이터는 붙여넣은 내용으로 교체됩니다.</p>
+              <p className="mt-1 text-xs text-sub">GPT가 만든 계좌별 JSON을 붙여넣으면 같은 계좌만 새 내용으로 교체됩니다.</p>
             </div>
             <button
               type="button"
@@ -1070,8 +1193,14 @@ export function PaperTradingView({
                   <p className="mt-1 text-xs text-slate-400">{selected?.account.owner || '소유자 미지정'} · 시작일 {selected?.account.createdAt}</p>
                 </div>
                 {selected && (
-                  <div className={`rounded-full border px-3 py-1 text-xs font-bold ${selected.summary.totalPnl >= 0 ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200' : 'border-rose-400/30 bg-rose-400/10 text-rose-200'}`}>
-                    {pct(selected.summary.totalPnlPct)}
+                  <div className="flex flex-col items-end gap-2">
+                    <div className={`rounded-full border px-3 py-1 text-xs font-bold ${selected.summary.totalPnl >= 0 ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200' : 'border-rose-400/30 bg-rose-400/10 text-rose-200'}`}>
+                      {pct(selected.summary.totalPnlPct)}
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => onEditAccount(selected.account)} className="rounded-md border border-slate-700 px-2 py-1 text-xs font-bold text-slate-300">수정</button>
+                      <button onClick={() => onDeleteAccount(selected.account.id)} className="rounded-md border border-rose-400/30 px-2 py-1 text-xs font-bold text-rose-300">삭제</button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1108,16 +1237,6 @@ export function PaperTradingView({
                 ))}
               </div>
             </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {accounts.map((account) => (
-              <button key={account.id} onClick={() => onSelectAccount(account.id)} className={`rounded-full border px-3 py-1.5 text-sm font-bold ${selected?.account.id === account.id ? 'border-brand bg-brand text-white' : 'border-border text-sub'}`}>
-                {account.name}
-              </button>
-            ))}
-            {selected && <button onClick={() => onEditAccount(selected.account)} className="rounded-full border border-border px-3 py-1.5 text-sm font-bold text-brand">계좌 수정</button>}
-            {selected && <button onClick={() => onDeleteAccount(selected.account.id)} className="rounded-full border border-rose-200 px-3 py-1.5 text-sm font-bold text-rose-600">계좌 삭제</button>}
           </div>
 
           {selected && (

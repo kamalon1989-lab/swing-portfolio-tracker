@@ -8,6 +8,7 @@ import {
   getFirebaseDb,
   googleProvider,
   userPtfPath,
+  type AiInsightItem,
   type HoldingItem,
   type JournalItem,
   type LegacyPortfolio,
@@ -38,6 +39,8 @@ import {
   type Tab,
   type Toast,
 } from './model';
+
+const AI_INSIGHTS_KEY = 'ptf_ai_insights';
 
 export function usePortfolioApp() {
   const [ready, setReady] = useState(false);
@@ -73,6 +76,7 @@ export function usePortfolioApp() {
   const [sharePayload, setSharePayload] = useState<SharePayload | null>(null);
   const [pdfPayload, setPdfPayload] = useState<SharePayload | null>(null);
   const [tickerMemos, setTickerMemos] = useState<Record<string, string>>({});
+  const [aiInsights, setAiInsights] = useState<AiInsightItem[]>([]);
   const [benchData, setBenchData] = useState<{ date: string; price: number }[]>([]);
   const [goalConfig, setGoalConfig] = useState<GoalConfig | null>(null);
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -117,6 +121,7 @@ export function usePortfolioApp() {
     const localHoldings = readJson<HoldingItem[]>(K.holdings, []);
     const localWatch = readJson<WatchItem[]>(K.watch, []);
     const localMemos = readJson<Record<string, string>>(K.memos, {});
+    const localAiInsights = readJson<AiInsightItem[]>(AI_INSIGHTS_KEY, []);
     const localGoal = readJson<GoalConfig | null>(K.goal, null);
     // holding.note / watch.note ??tickerMemos ?≪닔 (tickerMemos??媛믪씠 ?녿뒗 寃쎌슦留?
     const seedMemos = { ...localMemos };
@@ -137,6 +142,7 @@ export function usePortfolioApp() {
     setTheme(readJson<'light' | 'dark'>(K.theme, 'light'));
     setUseExtendedHours(readJson<boolean>(K.extendedHours, true));
     setTickerMemos(seedMemos);
+    setAiInsights(localAiInsights);
     setGoalConfig(localGoal);
     setReady(true);
 
@@ -155,6 +161,7 @@ export function usePortfolioApp() {
           setHoldings(loadedHoldings);
           setWatch(loadedWatch);
           setJournal(data.j ?? []);
+          setAiInsights(data.ai ?? localAiInsights);
           setHistory(normalizeHistory(data.hi));
           const loadedPaperAccounts = data.pa ?? [];
           const loadedPaperTrades = data.pt ?? [];
@@ -173,6 +180,7 @@ export function usePortfolioApp() {
           writeJson(K.holdings, loadedHoldings);
           writeJson(K.watch, data.w ?? []);
           writeJson(K.journal, data.j ?? []);
+          writeJson(AI_INSIGHTS_KEY, data.ai ?? localAiInsights);
           writeJson(K.history, data.hi ?? []);
           writeJson(K.paperAccounts, loadedPaperAccounts);
           writeJson(K.paperTrades, loadedPaperTrades);
@@ -221,6 +229,7 @@ export function usePortfolioApp() {
     writeJson(K.holdings, holdings);
     writeJson(K.watch, watch);
     writeJson(K.journal, journal);
+    writeJson(AI_INSIGHTS_KEY, aiInsights);
     writeJson(K.history, history);
     writeJson(K.paperAccounts, paperAccounts);
     writeJson(K.paperTrades, paperTrades);
@@ -230,7 +239,7 @@ export function usePortfolioApp() {
     writeJson(K.extendedHours, useExtendedHours);
     writeJson(K.memos, tickerMemos);
     writeJson(K.goal, goalConfig);
-  }, [ready, demo, holdings, watch, journal, history, paperAccounts, paperTrades, cash, prices, krw, useExtendedHours, tickerMemos, goalConfig]);
+  }, [ready, demo, holdings, watch, journal, aiInsights, history, paperAccounts, paperTrades, cash, prices, krw, useExtendedHours, tickerMemos, goalConfig]);
 
   useEffect(() => {
     if (!pdfPayload) return;
@@ -248,6 +257,7 @@ export function usePortfolioApp() {
           h: holdings,
           w: watch,
           j: journal,
+          ai: aiInsights,
           hi: history,
           pa: paperAccounts,
           pt: paperTrades,
@@ -261,7 +271,7 @@ export function usePortfolioApp() {
         setStatus('Firebase ?숆린???ㅽ뙣');
       }
     }, 1200);
-  }, [user, demo, holdings, watch, journal, history, paperAccounts, paperTrades, cash, tickerMemos, useExtendedHours, goalConfig]);
+  }, [user, demo, holdings, watch, journal, aiInsights, history, paperAccounts, paperTrades, cash, tickerMemos, useExtendedHours, goalConfig]);
 
   const rows = useMemo(() => {
     let totalValue = 0;
@@ -719,6 +729,7 @@ export function usePortfolioApp() {
       holdings: exportedHoldings,
       trades: exportedTrades,
       watchlist: exportedWatchlist,
+      aiInsights,
       history,
     };
   }
@@ -809,6 +820,36 @@ export function usePortfolioApp() {
     setHoldings((prev) => prev.map((h) => h.ticker === ticker ? { ...h, note: text } : h));
     // 愿??醫낅ぉ note ?숆린??
     setWatch((prev) => prev.map((w) => w.ticker === ticker ? { ...w, note: text } : w));
+  }
+
+  function saveAiInsight(item: Omit<AiInsightItem, 'id'> & { id?: string }) {
+    const ticker = item.scope === 'ticker' ? normalizeTicker(item.ticker ?? '') : '';
+    const title = item.title.trim() || (ticker ? `${ticker} AI 분석` : '포트폴리오 AI 분석');
+    const content = item.content.trim();
+    if (!content) {
+      notify('저장할 ChatGPT 답변을 붙여넣어 주세요');
+      return;
+    }
+    if (item.scope === 'ticker' && !ticker) {
+      notify('티커 분석은 티커가 필요합니다');
+      return;
+    }
+    const next: AiInsightItem = {
+      id: item.id || uid(),
+      date: item.date || today(),
+      scope: item.scope,
+      ticker: ticker || undefined,
+      title,
+      content,
+      source: item.source?.trim() || 'ChatGPT',
+    };
+    setAiInsights((prev) => [next, ...prev.filter((entry) => entry.id !== next.id)]);
+    notify('AI 분석을 저장했습니다');
+  }
+
+  function deleteAiInsight(id: string) {
+    setAiInsights((prev) => prev.filter((entry) => entry.id !== id));
+    notify('AI 분석을 삭제했습니다');
   }
 
   function saveGoal(config: GoalConfig) {
@@ -1089,8 +1130,11 @@ export function usePortfolioApp() {
     loadingEarnings,
     sharePayload,
     tickerMemos,
+    aiInsights,
     benchData,
     saveTickerMemo,
+    saveAiInsight,
+    deleteAiInsight,
     refreshBenchmark,
     goalConfig,
     showGoalForm,

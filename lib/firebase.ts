@@ -49,6 +49,7 @@ export interface LegacyPortfolio {
   w?: WatchItem[];        // watchlist
   j?: JournalItem[];      // journal (매매기록)
   hi?: HistoryEntry[];    // history (일별 기록)
+  ai?: AiInsightItem[];    // saved ChatGPT analysis notes
   c?: number;             // cash
   m?: Record<string, string>; // ticker memos
   xh?: boolean;            // use extended-hours prices
@@ -94,6 +95,16 @@ export interface JournalItem {
   fee?: number;
   note?: string;
   strategy?: string;
+}
+
+export interface AiInsightItem {
+  id: string;
+  date: string;
+  scope: 'portfolio' | 'ticker';
+  ticker?: string;
+  title: string;
+  content: string;
+  source?: string;
 }
 
 export interface PaperAccount {
