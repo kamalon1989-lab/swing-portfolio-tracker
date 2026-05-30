@@ -140,27 +140,41 @@ export function usePortfolioApp() {
 
     const localHoldings = readJson<HoldingItem[]>(K.holdings, []);
     const localWatch = readJson<WatchItem[]>(K.watch, []);
+    const localJournal = readJson<JournalItem[]>(K.journal, []);
+    const localHistory = readJson<HistoryEntry[]>(K.history, []);
     const localMemos = readJson<Record<string, string>>(K.memos, {});
     const localAiInsights = readJson<AiInsightItem[]>(AI_INSIGHTS_KEY, []);
     const localGoal = readJson<GoalConfig | null>(K.goal, null);
+    const localCash = readJson<number>(K.cash, 0);
+    const localExtendedHours = readJson<boolean>(K.extendedHours, true);
+    const localUpdatedAt = readJson<number>(LAST_UPDATED_KEY, 0);
+    const hasLocalPortfolioData = Boolean(
+      localHoldings.length ||
+      localWatch.length ||
+      localJournal.length ||
+      localHistory.length ||
+      localAiInsights.length ||
+      localCash ||
+      localGoal
+    );
     // holding.note / watch.note ??tickerMemos ?≪닔 (tickerMemos??媛믪씠 ?녿뒗 寃쎌슦留?
     const seedMemos = { ...localMemos };
     localHoldings.forEach((h) => { if (h.note && !seedMemos[h.ticker]) seedMemos[h.ticker] = h.note; });
     localWatch.forEach((w) => { if (w.note && !seedMemos[w.ticker]) seedMemos[w.ticker] = w.note; });
     setHoldings(localHoldings);
     setWatch(localWatch);
-    setJournal(readJson<JournalItem[]>(K.journal, []));
-    setHistory(readJson<HistoryEntry[]>(K.history, []));
+    setJournal(localJournal);
+    setHistory(localHistory);
     const localPaperAccounts = readJson<PaperAccount[]>(K.paperAccounts, []);
     const localPaperTrades = readJson<PaperTrade[]>(K.paperTrades, []);
     setPaperAccounts(localPaperAccounts);
     setPaperTrades(localPaperTrades);
     setSelectedPaperAccountId(localPaperAccounts[0]?.id ?? '');
-    setCash(readJson<number>(K.cash, 0));
+    setCash(localCash);
     setPrices(readJson<PriceMap>(K.prices, {}));
     setKrw(readJson<boolean>(K.krw, false));
     setTheme(readJson<'light' | 'dark'>(K.theme, 'light'));
-    setUseExtendedHours(readJson<boolean>(K.extendedHours, true));
+    setUseExtendedHours(localExtendedHours);
     setTickerMemos(seedMemos);
     setAiInsights(localAiInsights);
     setGoalConfig(localGoal);
@@ -175,6 +189,29 @@ export function usePortfolioApp() {
       try {
         const snap = await get(ref(getFirebaseDb(), userPtfPath(nextUser.uid)));
         const data = snap.val() as LegacyPortfolio | null;
+        const makeLocalPayload = (): LegacyPortfolio => ({
+          h: localHoldings,
+          w: localWatch,
+          j: localJournal,
+          ai: localAiInsights,
+          hi: localHistory,
+          pa: localPaperAccounts,
+          pt: localPaperTrades,
+          c: localCash,
+          m: seedMemos,
+          xh: localExtendedHours,
+          g: localGoal,
+          ua: localUpdatedAt || Date.now(),
+        });
+        const remoteUpdatedAt = Number(data?.ua ?? 0);
+        if ((!data && hasLocalPortfolioData) || (data && localUpdatedAt > remoteUpdatedAt)) {
+          const payload = makeLocalPayload();
+          latestCloudPayload.current = payload;
+          await set(ref(getFirebaseDb(), userPtfPath(nextUser.uid)), payload);
+          writeJson(LAST_UPDATED_KEY, payload.ua ?? Date.now());
+          notify('이 기기의 최신 데이터를 Firebase에 저장했습니다');
+          return;
+        }
         if (data) {
           const loadedHoldings = data.h ?? [];
           const loadedWatch = data.w ?? [];
@@ -208,6 +245,7 @@ export function usePortfolioApp() {
           writeJson(K.memos, mergedMemos);
           writeJson(K.extendedHours, data.xh ?? readJson<boolean>(K.extendedHours, true));
           writeJson(K.goal, loadedGoal);
+          writeJson(LAST_UPDATED_KEY, remoteUpdatedAt || Date.now());
           notify('Firebase 데이터를 불러왔습니다');
         }
       } catch {

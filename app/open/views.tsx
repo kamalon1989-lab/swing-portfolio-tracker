@@ -531,22 +531,38 @@ function AiInsightPanel({
 }) {
   const [open, setOpen] = useState(false);
   const [selectedInsight, setSelectedInsight] = useState<AiInsightItem | null>(null);
+  const [editingInsight, setEditingInsight] = useState<AiInsightItem | null>(null);
   const [scope, setScope] = useState<AiInsightItem['scope']>('portfolio');
   const [ticker, setTicker] = useState(tickers[0] ?? '');
   const [content, setContent] = useState('');
   const panelInsights = insights.filter((item) => (item.category ?? 'portfolio') === category);
   const insightTitle = (item: AiInsightItem) => item.title || (item.ticker ? `${item.ticker} AI 분석` : category === 'watchlist' ? '관심 종목 AI 분석' : '포트폴리오 AI 분석');
+  const beginEdit = (item: AiInsightItem) => {
+    setEditingInsight(item);
+    setScope(item.scope);
+    setTicker(item.ticker ?? tickers[0] ?? '');
+    setContent(item.content);
+    setOpen(true);
+    setSelectedInsight(null);
+  };
+  const resetForm = () => {
+    setEditingInsight(null);
+    setContent('');
+    setScope('portfolio');
+    setTicker(tickers[0] ?? '');
+  };
   const submit = () => {
     onSave({
-      date: new Date().toISOString().slice(0, 10),
+      id: editingInsight?.id,
+      date: editingInsight?.date || new Date().toISOString().slice(0, 10),
       category,
       scope,
       ticker: scope === 'ticker' ? ticker : undefined,
-      title: '',
+      title: editingInsight?.title ?? '',
       content,
-      source: 'ChatGPT',
+      source: editingInsight?.source ?? 'ChatGPT',
     });
-    setContent('');
+    resetForm();
     setOpen(false);
   };
   return (
@@ -556,7 +572,7 @@ function AiInsightPanel({
           <h2 className="font-bold text-slate-100">{panelTitle}</h2>
           <p className="mt-1 text-xs text-slate-400">{description}</p>
         </div>
-        <button type="button" onClick={() => setOpen((value) => !value)} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">
+        <button type="button" onClick={() => { if (open) resetForm(); setOpen((value) => !value); }} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white">
           {open ? '닫기' : '답변 붙여넣기'}
         </button>
       </div>
@@ -582,8 +598,8 @@ function AiInsightPanel({
           <div>
             <textarea className="h-56 w-full resize-y rounded-xl border border-slate-700 bg-slate-900 p-3 text-sm leading-6 text-slate-100 outline-none" value={content} placeholder="ChatGPT 답변을 여기에 붙여넣으세요." onChange={(e) => setContent(e.target.value)} />
             <div className="mt-2 flex justify-end gap-2">
-              <button type="button" onClick={() => setContent('')} className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-bold text-slate-300">비우기</button>
-              <button type="button" onClick={submit} disabled={!content.trim()} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white disabled:opacity-40">저장</button>
+              <button type="button" onClick={resetForm} className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-bold text-slate-300">{editingInsight ? '수정 취소' : '비우기'}</button>
+              <button type="button" onClick={submit} disabled={!content.trim()} className="rounded-lg bg-brand px-3 py-2 text-sm font-bold text-white disabled:opacity-40">{editingInsight ? '수정 저장' : '저장'}</button>
             </div>
           </div>
         </div>
@@ -598,7 +614,10 @@ function AiInsightPanel({
                   <div className="text-[11px] font-bold text-slate-400">{item.date} · {item.ticker ?? '전체'}</div>
                   <h3 className="mt-1 truncate text-sm font-bold text-slate-100">{insightTitle(item)}</h3>
                 </button>
-                <button type="button" onClick={() => onDelete(item.id)} className="text-xs font-bold text-rose-300">삭제</button>
+                <div className="flex shrink-0 gap-2">
+                  <button type="button" onClick={() => beginEdit(item)} className="text-xs font-bold text-sky-300">수정</button>
+                  <button type="button" onClick={() => onDelete(item.id)} className="text-xs font-bold text-rose-300">삭제</button>
+                </div>
               </div>
               <button type="button" onClick={() => setSelectedInsight(item)} className="mt-2 block w-full text-left">
                 <p className="line-clamp-3 whitespace-pre-wrap text-xs leading-5 text-slate-400">{item.content}</p>
@@ -617,7 +636,10 @@ function AiInsightPanel({
                 <div className="text-xs font-bold text-slate-400">{selectedInsight.date} · {selectedInsight.ticker ?? '전체 포트폴리오'} · {selectedInsight.source ?? 'ChatGPT'}</div>
                 <h3 className="mt-1 text-lg font-extrabold text-slate-100">{insightTitle(selectedInsight)}</h3>
               </div>
-              <button type="button" onClick={() => setSelectedInsight(null)} className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-300">닫기</button>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => beginEdit(selectedInsight)} className="rounded-lg border border-sky-500/40 px-3 py-1.5 text-xs font-bold text-sky-300">수정</button>
+                <button type="button" onClick={() => setSelectedInsight(null)} className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-300">닫기</button>
+              </div>
             </div>
             <div className="max-h-[68vh] overflow-y-auto p-5">
               <p className="whitespace-pre-wrap text-sm leading-7 text-slate-200">{selectedInsight.content}</p>
