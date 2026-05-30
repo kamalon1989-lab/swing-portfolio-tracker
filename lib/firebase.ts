@@ -63,6 +63,7 @@ export interface LegacyPortfolio {
     style: '공격형' | '중립형' | '보수형' | '자유형';
     customRate?: number;
   } | null;                // investment goal
+  ua?: number;             // last cloud update timestamp
   k?: string | null;      // (Phase 3에서 제거 예정) finnhub api key
 }
 
@@ -136,8 +137,11 @@ export interface PaperTrade {
 
 export interface HistoryEntry {
   date: string;
-  totalVal: number;
-  totalCost: number;
+  totalVal?: number;
+  totalValue?: number;
+  stockValue?: number;
+  cashValue?: number;
+  totalCost?: number;
   // legacy 구조에 따라 추가 필드 가능
   [key: string]: unknown;
 }

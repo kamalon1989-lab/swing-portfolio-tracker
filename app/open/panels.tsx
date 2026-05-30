@@ -256,6 +256,13 @@ export function AssetsView({
     },
   ].filter((row) => row.value > 0);
   const sortedHistory = [...history].sort((a, b) => a.date.localeCompare(b.date));
+  const displayHistory = sortedHistory
+    .map((entry, index) => {
+      const prev = sortedHistory[index - 1];
+      const change = prev?.totalValue ? ((entry.totalValue - prev.totalValue) / prev.totalValue) * 100 : 0;
+      return { entry, prev, change };
+    })
+    .reverse();
   const latestHistory = sortedHistory[sortedHistory.length - 1];
   const prevHistory = sortedHistory[sortedHistory.length - 2];
   const latestChangePct = latestHistory && prevHistory?.totalValue ? ((latestHistory.totalValue - prevHistory.totalValue) / prevHistory.totalValue) * 100 : null;
@@ -288,9 +295,7 @@ export function AssetsView({
           </div>
         </div>
         <div className="mt-4 space-y-3 sm:hidden">
-          {sortedHistory.map((h, index) => {
-            const prev = sortedHistory[index - 1];
-            const change = prev?.totalValue ? ((h.totalValue - prev.totalValue) / prev.totalValue) * 100 : 0;
+          {displayHistory.map(({ entry: h, prev, change }) => {
             return (
               <div key={h.date} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -330,9 +335,7 @@ export function AssetsView({
         <div className="mt-4 hidden overflow-x-auto rounded-xl border border-slate-800 sm:block">
           <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-slate-900 text-xs text-slate-400"><tr><th className="px-3 py-3 text-left">날짜</th><th className="px-3 py-3 text-right">총 자산</th><th className="px-3 py-3 text-right">주식</th><th className="px-3 py-3 text-right">예수금</th><th className="px-3 py-3 text-right">변화율</th><th className="px-3 py-3 text-right">관리</th></tr></thead>
-            <tbody>{sortedHistory.map((h, index) => {
-              const prev = sortedHistory[index - 1];
-              const change = prev?.totalValue ? ((h.totalValue - prev.totalValue) / prev.totalValue) * 100 : 0;
+            <tbody>{displayHistory.map(({ entry: h, prev, change }) => {
               return (
                 <tr key={h.date} className="border-t border-slate-800 hover:bg-slate-900/70">
                   <td className="px-3 py-3 font-semibold text-slate-200">{h.date}</td>

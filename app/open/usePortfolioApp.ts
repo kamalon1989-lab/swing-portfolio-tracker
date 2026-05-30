@@ -41,6 +41,8 @@ import {
 } from './model';
 
 const AI_INSIGHTS_KEY = 'ptf_ai_insights';
+const LAST_UPDATED_KEY = 'ptf_last_updated_at';
+const CLOUD_SYNC_DELAY_MS = 300;
 
 export function usePortfolioApp() {
   const [ready, setReady] = useState(false);
@@ -89,12 +91,30 @@ export function usePortfolioApp() {
   const [showPaperTradeForm, setShowPaperTradeForm] = useState(false);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cloudLoaded = useRef(false);
+  const latestCloudPayload = useRef<LegacyPortfolio | null>(null);
 
   const notify = (message: string) => {
     const item = { id: Date.now(), message };
     setToast(item);
     window.setTimeout(() => setToast((current) => (current?.id === item.id ? null : current)), 2500);
   };
+
+  function currentCloudPayload(): LegacyPortfolio {
+    return {
+      h: holdings,
+      w: watch,
+      j: journal,
+      ai: aiInsights,
+      hi: history,
+      pa: paperAccounts,
+      pt: paperTrades,
+      c: cash,
+      m: tickerMemos,
+      xh: useExtendedHours,
+      g: goalConfig,
+      ua: Date.now(),
+    };
+  }
 
   useEffect(() => {
     if (window.location.hash.startsWith('#share=')) {
@@ -239,6 +259,7 @@ export function usePortfolioApp() {
     writeJson(K.extendedHours, useExtendedHours);
     writeJson(K.memos, tickerMemos);
     writeJson(K.goal, goalConfig);
+    writeJson(LAST_UPDATED_KEY, Date.now());
   }, [ready, demo, holdings, watch, journal, aiInsights, history, paperAccounts, paperTrades, cash, prices, krw, useExtendedHours, tickerMemos, goalConfig]);
 
   useEffect(() => {
@@ -251,27 +272,37 @@ export function usePortfolioApp() {
   useEffect(() => {
     if (!user || demo || !cloudLoaded.current) return;
     if (syncTimer.current) clearTimeout(syncTimer.current);
+    const payload = currentCloudPayload();
+    latestCloudPayload.current = payload;
     syncTimer.current = setTimeout(async () => {
       try {
-        await set(ref(getFirebaseDb(), userPtfPath(user.uid)), {
-          h: holdings,
-          w: watch,
-          j: journal,
-          ai: aiInsights,
-          hi: history,
-          pa: paperAccounts,
-          pt: paperTrades,
-          c: cash,
-          m: tickerMemos,
-          xh: useExtendedHours,
-          g: goalConfig,
-        });
+        await set(ref(getFirebaseDb(), userPtfPath(user.uid)), payload);
         setStatus('Firebase ?숆린???꾨즺');
       } catch {
         setStatus('Firebase ?숆린???ㅽ뙣');
       }
-    }, 1200);
+    }, CLOUD_SYNC_DELAY_MS);
   }, [user, demo, holdings, watch, journal, aiInsights, history, paperAccounts, paperTrades, cash, tickerMemos, useExtendedHours, goalConfig]);
+
+  useEffect(() => {
+    if (!user || demo) return;
+    const flushCloud = () => {
+      const payload = latestCloudPayload.current;
+      if (!payload) return;
+      set(ref(getFirebaseDb(), userPtfPath(user.uid)), payload).catch(() => undefined);
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') flushCloud();
+    };
+    window.addEventListener('pagehide', flushCloud);
+    window.addEventListener('beforeunload', flushCloud);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flushCloud);
+      window.removeEventListener('beforeunload', flushCloud);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [user, demo]);
 
   const rows = useMemo(() => {
     let totalValue = 0;
@@ -896,12 +927,22 @@ export function usePortfolioApp() {
       content,
       source: item.source?.trim() || 'ChatGPT',
     };
-    setAiInsights((prev) => [next, ...prev.filter((entry) => entry.id !== next.id)]);
+    setAiInsights((prev) => {
+      const updated = [next, ...prev.filter((entry) => entry.id !== next.id)];
+      writeJson(AI_INSIGHTS_KEY, updated);
+      writeJson(LAST_UPDATED_KEY, Date.now());
+      return updated;
+    });
     notify('AI 분석을 저장했습니다');
   }
 
   function deleteAiInsight(id: string) {
-    setAiInsights((prev) => prev.filter((entry) => entry.id !== id));
+    setAiInsights((prev) => {
+      const updated = prev.filter((entry) => entry.id !== id);
+      writeJson(AI_INSIGHTS_KEY, updated);
+      writeJson(LAST_UPDATED_KEY, Date.now());
+      return updated;
+    });
     notify('AI 분석을 삭제했습니다');
   }
 
