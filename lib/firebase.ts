@@ -51,6 +51,8 @@ export interface LegacyPortfolio {
   hi?: HistoryEntry[];    // history (일별 기록)
   ai?: AiInsightItem[];    // saved ChatGPT analysis notes
   c?: number;             // cash
+  cu?: number;            // USD cash
+  ck?: number;            // KRW cash
   m?: Record<string, string>; // ticker memos
   xh?: boolean;            // use extended-hours prices
   pa?: PaperAccount[];      // paper trading accounts
@@ -72,8 +74,12 @@ export interface HoldingItem {
   name?: string;
   shares: number;
   avgCost: number;
+  currency?: 'USD' | 'KRW';
+  inputAvgCost?: number;
   targetPrice?: number;
   stopLoss?: number;
+  inputTargetPrice?: number;
+  inputStopLoss?: number;
   note?: string;
   buyDate?: string | null;
   lastBuyDate?: string | null;
@@ -83,6 +89,8 @@ export interface WatchItem {
   ticker: string;
   name?: string;
   targetBuy?: number;
+  currency?: 'USD' | 'KRW';
+  inputTargetBuy?: number;
   note?: string;
 }
 
@@ -94,6 +102,9 @@ export interface JournalItem {
   shares: number;
   price: number;
   fee?: number;
+  currency?: 'USD' | 'KRW';
+  inputPrice?: number;
+  inputFee?: number;
   note?: string;
   strategy?: string;
 }
@@ -114,6 +125,8 @@ export interface PaperAccount {
   name: string;
   owner?: string;
   initialCash: number;
+  currency?: 'USD' | 'KRW';
+  inputInitialCash?: number;
   createdAt: string;
   note?: string;
 }
@@ -127,6 +140,9 @@ export interface PaperTrade {
   shares: number;
   price: number;
   fee?: number;
+  currency?: 'USD' | 'KRW';
+  inputPrice?: number;
+  inputFee?: number;
   strategy?: string;
   thesis?: string;
   risk?: string;

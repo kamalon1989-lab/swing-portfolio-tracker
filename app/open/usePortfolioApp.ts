@@ -54,6 +54,8 @@ export function usePortfolioApp() {
   const [journal, setJournal] = useState<JournalItem[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [cash, setCash] = useState(0);
+  const [cashUsd, setCashUsd] = useState(0);
+  const [cashKrw, setCashKrw] = useState(0);
   const [prices, setPrices] = useState<PriceMap>({});
   const [krw, setKrw] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -109,6 +111,8 @@ export function usePortfolioApp() {
       pa: paperAccounts,
       pt: paperTrades,
       c: cash,
+      cu: cashUsd,
+      ck: cashKrw,
       m: tickerMemos,
       xh: useExtendedHours,
       g: goalConfig,
@@ -131,6 +135,8 @@ export function usePortfolioApp() {
       setWatch(demoWatch);
       setJournal(demoJournal);
       setCash(8500);
+      setCashUsd(8500);
+      setCashKrw(0);
       setPrices(demoPrices);
       setStatus('?곕え 媛???쒖꽭');
       setReady(true);
@@ -146,6 +152,8 @@ export function usePortfolioApp() {
     const localAiInsights = readJson<AiInsightItem[]>(AI_INSIGHTS_KEY, []);
     const localGoal = readJson<GoalConfig | null>(K.goal, null);
     const localCash = readJson<number>(K.cash, 0);
+    const localCashUsd = readJson<number>(K.cashUsd, localCash);
+    const localCashKrw = readJson<number>(K.cashKrw, 0);
     const localExtendedHours = readJson<boolean>(K.extendedHours, true);
     const localUpdatedAt = readJson<number>(LAST_UPDATED_KEY, 0);
     const hasLocalPortfolioData = Boolean(
@@ -155,6 +163,8 @@ export function usePortfolioApp() {
       localHistory.length ||
       localAiInsights.length ||
       localCash ||
+      localCashUsd ||
+      localCashKrw ||
       localGoal
     );
     // holding.note / watch.note ??tickerMemos ?≪닔 (tickerMemos??媛믪씠 ?녿뒗 寃쎌슦留?
@@ -171,6 +181,8 @@ export function usePortfolioApp() {
     setPaperTrades(localPaperTrades);
     setSelectedPaperAccountId(localPaperAccounts[0]?.id ?? '');
     setCash(localCash);
+    setCashUsd(localCashUsd);
+    setCashKrw(localCashKrw);
     setPrices(readJson<PriceMap>(K.prices, {}));
     setKrw(readJson<boolean>(K.krw, false));
     setTheme(readJson<'light' | 'dark'>(K.theme, 'light'));
@@ -198,6 +210,8 @@ export function usePortfolioApp() {
           pa: localPaperAccounts,
           pt: localPaperTrades,
           c: localCash,
+          cu: localCashUsd,
+          ck: localCashKrw,
           m: seedMemos,
           xh: localExtendedHours,
           g: localGoal,
@@ -226,6 +240,8 @@ export function usePortfolioApp() {
           setPaperTrades(loadedPaperTrades);
           setSelectedPaperAccountId((current) => current || loadedPaperAccounts[0]?.id || '');
           setCash(data.c ?? 0);
+          setCashUsd(data.cu ?? data.c ?? 0);
+          setCashKrw(data.ck ?? 0);
           setUseExtendedHours(data.xh ?? readJson<boolean>(K.extendedHours, true));
           const loadedGoal = data.g ?? localGoal ?? null;
           setGoalConfig(loadedGoal);
@@ -242,6 +258,8 @@ export function usePortfolioApp() {
           writeJson(K.paperAccounts, loadedPaperAccounts);
           writeJson(K.paperTrades, loadedPaperTrades);
           writeJson(K.cash, data.c ?? 0);
+          writeJson(K.cashUsd, data.cu ?? data.c ?? 0);
+          writeJson(K.cashKrw, data.ck ?? 0);
           writeJson(K.memos, mergedMemos);
           writeJson(K.extendedHours, data.xh ?? readJson<boolean>(K.extendedHours, true));
           writeJson(K.goal, loadedGoal);
@@ -271,6 +289,11 @@ export function usePortfolioApp() {
   }, []);
 
   useEffect(() => {
+    if (!ready || demo || !rate || !cashKrw) return;
+    setCash(roundNumber(cashUsd + cashKrw / rate, 6));
+  }, [cashKrw, cashUsd, demo, rate, ready]);
+
+  useEffect(() => {
     if (!ready || sharePayload) return;
     if (demo || user) refreshEarnings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -292,13 +315,15 @@ export function usePortfolioApp() {
     writeJson(K.paperAccounts, paperAccounts);
     writeJson(K.paperTrades, paperTrades);
     writeJson(K.cash, cash);
+    writeJson(K.cashUsd, cashUsd);
+    writeJson(K.cashKrw, cashKrw);
     writeJson(K.prices, prices);
     writeJson(K.krw, krw);
     writeJson(K.extendedHours, useExtendedHours);
     writeJson(K.memos, tickerMemos);
     writeJson(K.goal, goalConfig);
     writeJson(LAST_UPDATED_KEY, Date.now());
-  }, [ready, demo, holdings, watch, journal, aiInsights, history, paperAccounts, paperTrades, cash, prices, krw, useExtendedHours, tickerMemos, goalConfig]);
+  }, [ready, demo, holdings, watch, journal, aiInsights, history, paperAccounts, paperTrades, cash, cashUsd, cashKrw, prices, krw, useExtendedHours, tickerMemos, goalConfig]);
 
   useEffect(() => {
     if (!pdfPayload) return;
@@ -320,7 +345,7 @@ export function usePortfolioApp() {
         setStatus('Firebase ?숆린???ㅽ뙣');
       }
     }, CLOUD_SYNC_DELAY_MS);
-  }, [user, demo, holdings, watch, journal, aiInsights, history, paperAccounts, paperTrades, cash, tickerMemos, useExtendedHours, goalConfig]);
+  }, [user, demo, holdings, watch, journal, aiInsights, history, paperAccounts, paperTrades, cash, cashUsd, cashKrw, tickerMemos, useExtendedHours, goalConfig]);
 
   useEffect(() => {
     if (!user || demo) return;
@@ -647,6 +672,21 @@ export function usePortfolioApp() {
     setEditingWatch(null);
   }
 
+  function tradeCashDelta(trade: JournalItem) {
+    const sign = trade.action === 'buy' || trade.action === 'withdraw' ? -1 : 1;
+    const isCashFlow = trade.action === 'deposit' || trade.action === 'withdraw';
+    const baseAmount = isCashFlow ? trade.price : trade.shares * trade.price;
+    const baseDelta = sign * baseAmount - (isCashFlow ? 0 : (trade.fee || 0));
+    if (trade.currency === 'KRW') {
+      const inputAmount = isCashFlow
+        ? (trade.inputPrice ?? (rate ? trade.price * rate : 0))
+        : trade.shares * (trade.inputPrice ?? (rate ? trade.price * rate : 0));
+      const inputFee = isCashFlow ? 0 : (trade.inputFee ?? (rate ? (trade.fee || 0) * rate : 0));
+      return { base: baseDelta, usd: 0, krw: sign * inputAmount - inputFee };
+    }
+    return { base: baseDelta, usd: baseDelta, krw: 0 };
+  }
+
   function saveTrade(item: JournalItem, syncHolding: boolean) {
     const trade = { ...item, ticker: normalizeTicker(item.ticker), id: item.id || uid() };
     const isCashFlow = trade.action === 'deposit' || trade.action === 'withdraw';
@@ -662,16 +702,23 @@ export function usePortfolioApp() {
       notify('티커, 수량, 단가는 필수입니다');
       return;
     }
-    const previousCashImpact = editingTrade && (editingTrade.action === 'deposit' || editingTrade.action === 'withdraw')
-      ? (editingTrade.action === 'deposit' ? 1 : -1) * editingTrade.price
-      : 0;
+    const previousCashDelta = editingTrade && (editingTrade.action === 'deposit' || editingTrade.action === 'withdraw')
+      ? tradeCashDelta(editingTrade)
+      : { base: 0, usd: 0, krw: 0 };
     if (isCashFlow) {
-      const nextCashImpact = (trade.action === 'deposit' ? 1 : -1) * trade.price;
-      setCash((prev) => prev + nextCashImpact - previousCashImpact);
-    } else if (previousCashImpact) {
-      setCash((prev) => prev - previousCashImpact);
+      const nextCashDelta = tradeCashDelta(trade);
+      setCash((prev) => prev + nextCashDelta.base - previousCashDelta.base);
+      setCashUsd((prev) => prev + nextCashDelta.usd - previousCashDelta.usd);
+      setCashKrw((prev) => prev + nextCashDelta.krw - previousCashDelta.krw);
+    } else if (previousCashDelta.base) {
+      setCash((prev) => prev - previousCashDelta.base);
+      setCashUsd((prev) => prev - previousCashDelta.usd);
+      setCashKrw((prev) => prev - previousCashDelta.krw);
     } else if (syncHolding && !editingTrade) {
-      setCash((prev) => prev + (trade.action === 'buy' ? -1 : 1) * trade.shares * trade.price - (trade.fee || 0));
+      const nextCashDelta = tradeCashDelta(trade);
+      setCash((prev) => prev + nextCashDelta.base);
+      setCashUsd((prev) => prev + nextCashDelta.usd);
+      setCashKrw((prev) => prev + nextCashDelta.krw);
       setHoldings((prev) => {
         const idx = prev.findIndex((x) => x.ticker === trade.ticker);
         if (trade.action === 'buy') {
@@ -704,8 +751,10 @@ export function usePortfolioApp() {
   function deleteTrade(id: string) {
     const trade = journal.find((item) => item.id === id);
     if (trade?.action === 'deposit' || trade?.action === 'withdraw') {
-      const cashImpact = (trade.action === 'deposit' ? 1 : -1) * trade.price;
-      setCash((prev) => prev - cashImpact);
+      const cashDelta = tradeCashDelta(trade);
+      setCash((prev) => prev - cashDelta.base);
+      setCashUsd((prev) => prev - cashDelta.usd);
+      setCashKrw((prev) => prev - cashDelta.krw);
     }
     setJournal((prev) => prev.filter((item) => item.id !== id));
   }
@@ -774,6 +823,10 @@ export function usePortfolioApp() {
       return {
         ticker: row.ticker,
         name: row.name ?? '',
+        currency: row.currency ?? 'USD',
+        inputAvgCost: row.inputAvgCost ?? null,
+        inputTargetPrice: row.inputTargetPrice ?? null,
+        inputStopLoss: row.inputStopLoss ?? null,
         shares,
         avgCost,
         cost,
@@ -804,6 +857,9 @@ export function usePortfolioApp() {
         id: trade.id,
         date: trade.date,
         side: trade.action.toUpperCase(),
+        currency: trade.currency ?? 'USD',
+        inputPrice: trade.inputPrice ?? null,
+        inputFee: trade.inputFee ?? null,
         ticker: isCashFlow ? 'CASH' : trade.ticker,
         shares,
         price,
@@ -823,6 +879,8 @@ export function usePortfolioApp() {
       return {
         ticker: item.ticker,
         name: item.name ?? '',
+        currency: item.currency ?? 'USD',
+        inputTargetBuy: item.inputTargetBuy ?? null,
         currentPrice,
         targetEntry,
         distancePct,
@@ -834,10 +892,13 @@ export function usePortfolioApp() {
     return {
       schemaVersion: '2.0',
       exportPurpose: 'ai_portfolio_analysis',
+      baseCurrency: 'USD',
       summary: {
         exportedAt,
         stockValue,
         cash: roundNumber(cash),
+        cashUsd: roundNumber(cashUsd),
+        cashKrw: roundNumber(cashKrw),
         totalAsset,
         totalCost: roundNumber(summary.totalCost),
         totalPnl: roundNumber(summary.totalPnl),
@@ -923,8 +984,14 @@ export function usePortfolioApp() {
     return signOut(getFirebaseAuth());
   }
 
-  function saveCash(nextCash: number) {
-    setCash(nextCash);
+  function saveCash(nextCashUsd: number, nextCashKrw: number) {
+    if (nextCashKrw && !rate) {
+      notify('환율을 불러온 뒤 원화 예수금을 저장할 수 있습니다');
+      return;
+    }
+    setCashUsd(nextCashUsd);
+    setCashKrw(nextCashKrw);
+    setCash(roundNumber(nextCashUsd + (rate ? nextCashKrw / rate : 0), 6));
     setShowCashForm(false);
   }
 
@@ -1225,6 +1292,8 @@ export function usePortfolioApp() {
     setJournal,
     history,
     cash,
+    cashUsd,
+    cashKrw,
     setCash,
     prices,
     krw,

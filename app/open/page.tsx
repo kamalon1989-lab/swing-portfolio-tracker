@@ -64,6 +64,8 @@ export default function OpenPage() {
     setJournal,
     history,
     cash,
+    cashUsd,
+    cashKrw,
     prices,
     krw,
     setKrw,
@@ -344,12 +346,12 @@ export default function OpenPage() {
       )}
 
       {showSizingForm && <PositionSizingForm totalAsset={summary.totalAsset} onClose={() => setShowSizingForm(false)} />}
-      {showHoldingForm && <HoldingForm item={editingHolding} onClose={() => setShowHoldingForm(false)} onSave={saveHolding} />}
-      {showWatchForm && <WatchForm item={editingWatch} onClose={() => setShowWatchForm(false)} onSave={saveWatch} />}
-      {showTradeForm && <TradeForm item={editingTrade} onClose={() => setShowTradeForm(false)} onSave={saveTrade} />}
-      {showPaperAccountForm && <PaperAccountForm item={editingPaperAccount} onClose={() => setShowPaperAccountForm(false)} onSave={savePaperAccount} />}
+      {showHoldingForm && <HoldingForm item={editingHolding} defaultCurrency={krw ? 'KRW' : 'USD'} rate={rate} onClose={() => setShowHoldingForm(false)} onSave={saveHolding} />}
+      {showWatchForm && <WatchForm item={editingWatch} defaultCurrency={krw ? 'KRW' : 'USD'} rate={rate} onClose={() => setShowWatchForm(false)} onSave={saveWatch} />}
+      {showTradeForm && <TradeForm item={editingTrade} defaultCurrency={krw ? 'KRW' : 'USD'} rate={rate} onClose={() => setShowTradeForm(false)} onSave={saveTrade} />}
+      {showPaperAccountForm && <PaperAccountForm item={editingPaperAccount} defaultCurrency={krw ? 'KRW' : 'USD'} rate={rate} onClose={() => setShowPaperAccountForm(false)} onSave={savePaperAccount} />}
       {showPaperTradeForm && <PaperTradeForm item={editingPaperTrade} accountId={selectedPaperAccountId || paperAccounts[0]?.id || ''} accounts={paperAccounts} onClose={() => setShowPaperTradeForm(false)} onSave={savePaperTrade} />}
-      {showCashForm && <CashForm cash={cash} onClose={() => setShowCashForm(false)} onSave={saveCash} />}
+      {showCashForm && <CashForm cashUsd={cashUsd} cashKrw={cashKrw} rate={rate} onClose={() => setShowCashForm(false)} onSave={saveCash} />}
       {showRecordForm && <RecordDateForm onClose={() => setShowRecordForm(false)} onSave={recordToday} />}
       {showHistoryForm && editingHistory && <HistoryForm entry={editingHistory} onClose={() => { setShowHistoryForm(false); setEditingHistory(null); }} onSave={saveHistory} />}
       {showGoalForm && <GoalForm initial={goalConfig} currentAsset={summary.totalAsset} krw={krw} rate={rate} onClose={() => setShowGoalForm(false)} onSave={saveGoal} />}

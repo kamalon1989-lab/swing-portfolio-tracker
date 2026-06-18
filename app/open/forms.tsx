@@ -2,23 +2,50 @@
 
 import { FormEvent, useState } from 'react';
 import type { HoldingItem, JournalItem, WatchItem } from '@/lib/firebase';
-import { today, usd, type GoalConfig, type HistoryEntry, type InvestStyle, type PaperAccount, type PaperTrade } from './model';
+import { formatCurrency, fromBaseCurrency, today, toBaseCurrency, usd, type Currency, type GoalConfig, type HistoryEntry, type InvestStyle, type PaperAccount, type PaperTrade } from './model';
 
 export function HoldingForm({
   item,
+  defaultCurrency,
+  rate,
   onSave,
   onClose,
 }: {
   item: HoldingItem | null;
+  defaultCurrency: Currency;
+  rate: number;
   onSave: (item: HoldingItem) => void;
   onClose: () => void;
 }) {
+  const initialCurrency = item?.currency ?? defaultCurrency;
   const [form, setForm] = useState<HoldingItem>(
-    item ?? { ticker: '', name: '', shares: 0, avgCost: 0, targetPrice: 0, stopLoss: 0, note: '', buyDate: today() }
+    item
+      ? {
+          ...item,
+          avgCost: item.inputAvgCost ?? fromBaseCurrency(item.avgCost, initialCurrency, rate),
+          targetPrice: item.inputTargetPrice ?? fromBaseCurrency(item.targetPrice ?? 0, initialCurrency, rate),
+          stopLoss: item.inputStopLoss ?? fromBaseCurrency(item.stopLoss ?? 0, initialCurrency, rate),
+        }
+      : { ticker: '', name: '', shares: 0, avgCost: 0, targetPrice: 0, stopLoss: 0, note: '', buyDate: today(), currency: initialCurrency }
   );
+  const [currency, setCurrency] = useState<Currency>(initialCurrency);
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    onSave({
+      ...form,
+      currency,
+      inputAvgCost: form.avgCost || undefined,
+      inputTargetPrice: form.targetPrice || undefined,
+      inputStopLoss: form.stopLoss || undefined,
+      avgCost: toBaseCurrency(Number(form.avgCost) || 0, currency, rate),
+      targetPrice: form.targetPrice ? toBaseCurrency(Number(form.targetPrice) || 0, currency, rate) : undefined,
+      stopLoss: form.stopLoss ? toBaseCurrency(Number(form.stopLoss) || 0, currency, rate) : undefined,
+    });
+  }
   return (
     <Modal title={item ? '보유 종목 수정' : '보유 종목 추가'} onClose={onClose}>
-      <form className="grid gap-3 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); onSave(form); }}>
+      <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit}>
+        <CurrencyField currency={currency} onChange={setCurrency} rate={rate} />
         <Field label="티커" required><input className={`${inputClass()} uppercase`} value={form.ticker} disabled={!!item} onChange={(e) => setForm({ ...form, ticker: e.target.value.toUpperCase() })} /></Field>
         <Field label="종목명" optional><input className={inputClass()} value={form.name ?? ''} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
         <Field label="수량" required><input className={inputClass()} type="number" step="0.0001" value={form.shares || ''} onChange={(e) => setForm({ ...form, shares: Number(e.target.value) })} /></Field>
@@ -35,17 +62,37 @@ export function HoldingForm({
 
 export function WatchForm({
   item,
+  defaultCurrency,
+  rate,
   onSave,
   onClose,
 }: {
   item: WatchItem | null;
+  defaultCurrency: Currency;
+  rate: number;
   onSave: (item: WatchItem) => void;
   onClose: () => void;
 }) {
-  const [form, setForm] = useState<WatchItem>(item ?? { ticker: '', name: '', targetBuy: 0, note: '' });
+  const initialCurrency = item?.currency ?? defaultCurrency;
+  const [form, setForm] = useState<WatchItem>(
+    item
+      ? { ...item, targetBuy: item.inputTargetBuy ?? fromBaseCurrency(item.targetBuy ?? 0, initialCurrency, rate) }
+      : { ticker: '', name: '', targetBuy: 0, note: '', currency: initialCurrency }
+  );
+  const [currency, setCurrency] = useState<Currency>(initialCurrency);
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    onSave({
+      ...form,
+      currency,
+      inputTargetBuy: form.targetBuy || undefined,
+      targetBuy: form.targetBuy ? toBaseCurrency(Number(form.targetBuy) || 0, currency, rate) : undefined,
+    });
+  }
   return (
     <Modal title={item ? '관심 종목 수정' : '관심 종목 추가'} onClose={onClose}>
-      <form className="grid gap-3 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); onSave(form); }}>
+      <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit}>
+        <CurrencyField currency={currency} onChange={setCurrency} rate={rate} />
         <Field label="티커" required><input className={`${inputClass()} uppercase`} value={form.ticker} disabled={!!item} onChange={(e) => setForm({ ...form, ticker: e.target.value.toUpperCase() })} /></Field>
         <Field label="종목명" optional><input className={inputClass()} value={form.name ?? ''} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
         <Field label="목표 진입가" optional><input className={inputClass()} type="number" step="0.01" value={form.targetBuy || ''} onChange={(e) => setForm({ ...form, targetBuy: Number(e.target.value) })} /></Field>
@@ -58,14 +105,24 @@ export function WatchForm({
 
 export function TradeForm({
   item,
+  defaultCurrency,
+  rate,
   onSave,
   onClose,
 }: {
   item: JournalItem | null;
+  defaultCurrency: Currency;
+  rate: number;
   onSave: (item: JournalItem, syncHolding: boolean) => void;
   onClose: () => void;
 }) {
-  const [form, setForm] = useState<JournalItem>(item ?? { id: '', date: today(), action: 'buy', ticker: '', shares: 0, price: 0, fee: 0, note: '' });
+  const initialCurrency = item?.currency ?? defaultCurrency;
+  const [form, setForm] = useState<JournalItem>(
+    item
+      ? { ...item, price: item.inputPrice ?? fromBaseCurrency(item.price, initialCurrency, rate), fee: item.inputFee ?? fromBaseCurrency(item.fee ?? 0, initialCurrency, rate) }
+      : { id: '', date: today(), action: 'buy', ticker: '', shares: 0, price: 0, fee: 0, currency: initialCurrency, note: '' }
+  );
+  const [currency, setCurrency] = useState<Currency>(initialCurrency);
   const initialFeePct = item && item.shares && item.price
     ? String(Number((((item.fee ?? 0) / (item.shares * item.price)) * 100).toFixed(4)))
     : '0.25';
@@ -73,9 +130,17 @@ export function TradeForm({
   const [sync, setSync] = useState(!item);
   const isCashFlow = form.action === 'deposit' || form.action === 'withdraw';
   const tradeAmount = (Number(form.shares) || 0) * (Number(form.price) || 0);
-  const feeAmount = tradeAmount * ((Number(feePct) || 0) / 100);
+  const feeAmountInput = tradeAmount * ((Number(feePct) || 0) / 100);
+  const feeAmount = toBaseCurrency(feeAmountInput, currency, rate);
   function submit(e: FormEvent) {
     e.preventDefault();
+    const basePrice = toBaseCurrency(Number(form.price) || 0, currency, rate);
+    const baseFee = feeAmount;
+    form.currency = currency;
+    form.inputPrice = form.price || undefined;
+    form.inputFee = feeAmountInput || undefined;
+    form.price = basePrice;
+    form.fee = baseFee;
     if (isCashFlow) {
       onSave({ ...form, ticker: 'CASH', shares: 1, fee: 0, strategy: form.action === 'deposit' ? '예수금 입금' : '예수금 출금' }, true);
       return;
@@ -85,6 +150,7 @@ export function TradeForm({
   return (
     <Modal title={item ? '거래 수정' : '거래 추가'} onClose={onClose}>
       <form className="grid grid-cols-2 items-start gap-3" onSubmit={submit}>
+        <CurrencyField currency={currency} onChange={setCurrency} rate={rate} />
         <Field label="날짜" required><input className={inputClass()} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></Field>
         <Field label="구분" required>
           <select className={inputClass()} value={form.action} onChange={(e) => setForm({ ...form, action: e.target.value as JournalItem['action'] })}>
@@ -108,7 +174,7 @@ export function TradeForm({
             <Field label="단가" required><input className={inputClass()} type="number" step="0.01" value={form.price || ''} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} /></Field>
             <Field label="수수료율 (%)" optional>
               <input className={inputClass()} type="number" step="0.01" min="0" value={feePct} onChange={(e) => setFeePct(e.target.value)} />
-              <div className="mt-1 text-xs text-sub">예상 수수료 {usd(feeAmount)}</div>
+              <div className="mt-1 text-xs text-sub">예상 수수료 {formatCurrency(feeAmountInput, currency)}</div>
             </Field>
             <label className="col-span-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={sync} disabled={!!item} onChange={(e) => setSync(e.target.checked)} /> 보유 종목과 예수금에 반영</label>
             <Field label="전략" optional>
@@ -128,19 +194,37 @@ export function TradeForm({
 
 export function PaperAccountForm({
   item,
+  defaultCurrency,
+  rate,
   onSave,
   onClose,
 }: {
   item: PaperAccount | null;
+  defaultCurrency: Currency;
+  rate: number;
   onSave: (item: PaperAccount) => void;
   onClose: () => void;
 }) {
+  const initialCurrency = item?.currency ?? defaultCurrency;
   const [form, setForm] = useState<PaperAccount>(
-    item ?? { id: '', name: '', owner: '', initialCash: 100000, createdAt: today(), note: '' }
+    item
+      ? { ...item, initialCash: item.inputInitialCash ?? fromBaseCurrency(item.initialCash, initialCurrency, rate) }
+      : { id: '', name: '', owner: '', initialCash: initialCurrency === 'KRW' && rate ? Math.round(100000 * rate) : 100000, currency: initialCurrency, createdAt: today(), note: '' }
   );
+  const [currency, setCurrency] = useState<Currency>(initialCurrency);
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    onSave({
+      ...form,
+      currency,
+      inputInitialCash: form.initialCash || undefined,
+      initialCash: toBaseCurrency(Number(form.initialCash) || 0, currency, rate),
+    });
+  }
   return (
     <Modal title={item ? '모의 계좌 수정' : '모의 계좌 추가'} onClose={onClose}>
-      <form className="grid gap-3 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); onSave(form); }}>
+      <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit}>
+        <CurrencyField currency={currency} onChange={setCurrency} rate={rate} />
         <Field label="계좌명" required><input className={inputClass()} value={form.name} placeholder="GPT 계좌" onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
         <Field label="소유자" optional><input className={inputClass()} value={form.owner ?? ''} placeholder="나, GPT, 친구" onChange={(e) => setForm({ ...form, owner: e.target.value })} /></Field>
         <Field label="시작 현금" required><input className={inputClass()} type="number" step="0.01" value={form.initialCash || ''} onChange={(e) => setForm({ ...form, initialCash: Number(e.target.value) })} /></Field>
@@ -297,19 +381,32 @@ export function HistoryForm({ entry, onSave, onClose }: { entry: HistoryEntry; o
 }
 
 export function CashForm({
-  cash,
+  cashUsd,
+  cashKrw,
+  rate,
   onSave,
   onClose,
 }: {
-  cash: number;
-  onSave: (cash: number) => void;
+  cashUsd: number;
+  cashKrw: number;
+  rate: number;
+  onSave: (cashUsd: number, cashKrw: number) => void;
   onClose: () => void;
 }) {
-  const [value, setValue] = useState(String(cash || ''));
+  const [usdValue, setUsdValue] = useState(String(cashUsd || ''));
+  const [krwValue, setKrwValue] = useState(String(cashKrw || ''));
+  const usdAmount = Number(usdValue) || 0;
+  const krwAmount = Number(krwValue) || 0;
+  const totalBase = usdAmount + (rate ? krwAmount / rate : 0);
   return (
     <Modal title="예수금 수정" onClose={onClose}>
-      <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); onSave(Number(value) || 0); }}>
-        <Field label="예수금" required><input className={inputClass()} type="number" step="0.01" value={value} onChange={(e) => setValue(e.target.value)} /></Field>
+      <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); onSave(usdAmount, krwAmount); }}>
+        <Field label="달러 예수금" optional><input className={inputClass()} type="number" step="0.01" value={usdValue} onChange={(e) => setUsdValue(e.target.value)} /></Field>
+        <Field label="원화 예수금" optional><input className={inputClass()} type="number" step="1" value={krwValue} onChange={(e) => setKrwValue(e.target.value)} /></Field>
+        <div className="rounded-xl border border-border bg-bg p-3 text-xs leading-5 text-sub">
+          <div className="font-semibold text-text">합산 예수금 {formatCurrency(totalBase, 'USD')}</div>
+          {rate ? <div>원화 환산 기준: {formatCurrency(krwAmount / rate, 'USD')} · USD/KRW {Math.round(rate).toLocaleString('ko-KR')}</div> : <div className="text-rose-500">환율을 불러온 뒤 원화 예수금을 합산할 수 있습니다.</div>}
+        </div>
         <button className="rounded-lg bg-brand px-4 py-2 font-bold text-white">저장</button>
       </form>
     </Modal>
@@ -475,6 +572,26 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
 
 function inputClass() {
   return 'w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-brand';
+}
+
+function CurrencyField({ currency, onChange, rate }: { currency: Currency; onChange: (currency: Currency) => void; rate: number }) {
+  return (
+    <Field label="입력 통화" required>
+      <div className="grid grid-cols-2 gap-2">
+        {(['USD', 'KRW'] as const).map((item) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => onChange(item)}
+            className={`rounded-lg border px-3 py-2 text-sm font-bold ${currency === item ? 'border-brand bg-brand/10 text-brand' : 'border-border text-sub'}`}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+      {currency === 'KRW' && !rate ? <span className="text-[11px] text-rose-500">환율을 불러온 뒤 원화 입력을 저장할 수 있습니다.</span> : null}
+    </Field>
+  );
 }
 
 function Field({ label, children, required, optional }: { label: string; children: React.ReactNode; required?: boolean; optional?: boolean }) {

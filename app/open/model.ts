@@ -28,6 +28,7 @@ export type HistoryEntry = {
   totalCost: number;
 };
 export type Toast = { id: number; message: string };
+export type Currency = 'USD' | 'KRW';
 export type NewsItem = { id: number; datetime: number; headline: string; source: string; url: string };
 export type NewsState = 'idle' | 'loading' | 'loaded' | 'empty' | 'error';
 export type EarningsItem = {
@@ -53,6 +54,8 @@ export type PaperAccount = {
   name: string;
   owner?: string;
   initialCash: number;
+  currency?: Currency;
+  inputInitialCash?: number;
   createdAt: string;
   note?: string;
 };
@@ -65,6 +68,9 @@ export type PaperTrade = {
   shares: number;
   price: number;
   fee?: number;
+  currency?: Currency;
+  inputPrice?: number;
+  inputFee?: number;
   strategy?: string;
   thesis?: string;
   risk?: string;
@@ -89,6 +95,8 @@ export const K = {
   history: 'ptf_hist',
   prices: 'ptf_px',
   cash: 'ptf_cash',
+  cashUsd: 'ptf_cash_usd',
+  cashKrw: 'ptf_cash_krw',
   journal: 'ptf_journal',
   watch: 'ptf_watch',
   krw: 'ptf_krw',
@@ -168,6 +176,24 @@ export function money(n: number, krw: boolean, rate: number) {
 
 export function usd(n: number) {
   return `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+export function krwMoney(n: number) {
+  return `₩${Math.round(n || 0).toLocaleString('ko-KR')}`;
+}
+
+export function formatCurrency(n: number, currency: Currency) {
+  return currency === 'KRW' ? krwMoney(n) : usd(n);
+}
+
+export function toBaseCurrency(n: number, currency: Currency, rate: number) {
+  if (currency === 'KRW') return rate ? n / rate : 0;
+  return n;
+}
+
+export function fromBaseCurrency(n: number, currency: Currency, rate: number) {
+  if (currency === 'KRW') return rate ? n * rate : 0;
+  return n;
 }
 
 export function pct(n: number) {
