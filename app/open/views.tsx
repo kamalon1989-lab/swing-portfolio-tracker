@@ -23,6 +23,7 @@ import {
   earningsSymbolMatches,
   money,
   pct,
+  krwMoney,
   usd,
   type EarningsItem,
   type PaperAccount,
@@ -34,6 +35,8 @@ import {
 
 type HoldingRow = HoldingItem & {
   price: number;
+  nativePrice?: number;
+  currency?: 'USD' | 'KRW';
   value: number;
   cost: number;
   pnl: number;
@@ -92,6 +95,12 @@ function compactUsd(value: number) {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
   if (Math.abs(value) >= 1_000) return `$${Math.round(value / 1_000)}K`;
   return `$${Math.round(value).toLocaleString('en-US')}`;
+}
+
+function quotePriceText(quote?: { price?: number; nativePrice?: number; currency?: 'USD' | 'KRW' }) {
+  if (!quote?.price) return '-';
+  if (quote.currency === 'KRW' && quote.nativePrice) return krwMoney(quote.nativePrice);
+  return usd(quote.price);
 }
 
 function priceSessionText(session?: PriceSession) {
@@ -275,7 +284,7 @@ export function PortfolioView(props: {
                 {r.name && <div className="mt-0.5 truncate text-xs text-sub">{r.name}</div>}
               </div>
               <div className="text-right">
-                <div className="font-bold">{r.price ? usd(r.price) : '-'}</div>
+                <div className="font-bold">{quotePriceText(r)}</div>
                 <div className="mt-1 flex flex-col items-end gap-1">
                   {r.price ? (
                     <PriceChangeStack
@@ -352,7 +361,7 @@ export function PortfolioView(props: {
                   <div className="text-xs text-sub">{r.name}</div>
                 </td>
                 <td className="px-3 py-3 text-right font-semibold">
-                  {r.price ? <div className="flex flex-col items-end gap-1"><span>{usd(r.price)}</span><PriceSessionBadge session={r.priceSession} /></div> : '-'}
+                  {r.price ? <div className="flex flex-col items-end gap-1"><span>{quotePriceText(r)}</span><PriceSessionBadge session={r.priceSession} /></div> : '-'}
                 </td>
                 <td className="px-3 py-3 text-right">{r.shares}</td>
                 <td className="px-3 py-3 text-right text-sub">{usd(r.avgCost)}</td>
@@ -815,7 +824,7 @@ export function WatchView({
                   {w.name && <div className="mt-0.5 truncate text-xs text-sub">{w.name}</div>}
                 </div>
                 <div className="text-right">
-                  <div className="font-bold">{price ? usd(price) : '-'}</div>
+                  <div className="font-bold">{quotePriceText(prices[w.ticker])}</div>
                   <div className="mt-1 flex flex-col items-end gap-1">
                     <PriceChangeStack quote={prices[w.ticker]} />
                     {price ? <PriceSessionBadge session={prices[w.ticker]?.session} /> : null}
@@ -854,7 +863,7 @@ export function WatchView({
               <tr key={w.ticker} onClick={() => onSelectTicker(w.ticker)} className="cursor-pointer border-t border-border hover:bg-bg">
                 <td className="px-3 py-3"><strong className="text-brand">{w.ticker}</strong><div className="text-xs text-sub">{w.name}</div></td>
                 <td className="px-3 py-3 text-right font-semibold">
-                  {price ? <div className="flex flex-col items-end gap-1"><span>{usd(price)}</span><PriceSessionBadge session={prices[w.ticker]?.session} /></div> : '-'}
+                  {price ? <div className="flex flex-col items-end gap-1"><span>{quotePriceText(prices[w.ticker])}</span><PriceSessionBadge session={prices[w.ticker]?.session} /></div> : '-'}
                 </td>
                 <td className="px-3 py-3 text-right">{w.targetBuy ? usd(w.targetBuy) : '-'}</td>
                 <td className={`px-3 py-3 text-right font-semibold ${dist === null ? '' : dist <= 0 ? 'text-emerald-600' : dist <= 5 ? 'text-amber-500' : 'text-sub'}`}>

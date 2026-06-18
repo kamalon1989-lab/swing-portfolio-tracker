@@ -382,6 +382,9 @@ export function usePortfolioApp() {
         priceSource: quote?.source,
         regularPrice: quote?.regularPrice,
         extendedPrice: quote?.extendedPrice,
+        nativePrice: quote?.nativePrice,
+        nativePrevClose: quote?.nativePrevClose,
+        currency: quote?.currency ?? h.currency,
         marketCap: quote?.marketCap,
         trailingPE: quote?.trailingPE,
         forwardPE: quote?.forwardPE,
@@ -444,30 +447,48 @@ export function usePortfolioApp() {
     if (!tickers.length) return;
     setLoadingPrices(true);
     try {
-      fetch('https://open.er-api.com/v6/latest/USD')
+      let currentRate = rate;
+      const exchange = await fetch('https://open.er-api.com/v6/latest/USD')
         .then((r) => r.json())
-        .then((d) => setRate(d.rates.KRW || 0))
-        .catch(() => undefined);
+        .catch(() => null);
+      if (exchange?.rates?.KRW) {
+        currentRate = exchange.rates.KRW;
+        setRate(currentRate);
+      }
       const token = await current.getIdToken();
       const next: PriceMap = { ...prices };
-      const yahooQuotes = await fetch(`/api/market/quote?symbols=${encodeURIComponent(tickers.join(','))}`, {
+      const krTickers = tickers.filter(isKoreanTicker);
+      const usTickers = tickers.filter((ticker) => !isKoreanTicker(ticker));
+      const yahooQuotes = usTickers.length ? await fetch(`/api/market/quote?symbols=${encodeURIComponent(usTickers.join(','))}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.ok ? res.json() : null)
-        .catch(() => null);
+        .catch(() => null) : null;
+      const krQuotes = krTickers.length ? await fetch(`/api/market/kr-quote?symbols=${encodeURIComponent(krTickers.join(','))}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => res.ok ? res.json() : null)
+        .catch(() => null) : null;
       const yahooMap = new Map<string, unknown>(
         ((yahooQuotes?.quotes ?? []) as Array<{ symbol?: string }>)
           .filter((item) => item.symbol)
           .map((item) => [String(item.symbol).toUpperCase(), item])
       );
+      const krMap = new Map<string, unknown>(
+        ((krQuotes?.quotes ?? []) as Array<{ symbol?: string }>)
+          .filter((item) => item.symbol)
+          .map((item) => [String(item.symbol).toUpperCase(), item])
+      );
       const missing: string[] = [];
       for (const ticker of tickers) {
-        const parsed = parseYahooQuote(yahooMap.get(ticker), useExtendedHours);
+        const parsed = isKoreanTicker(ticker)
+          ? parseKoreanQuote(krMap.get(ticker), currentRate)
+          : parseYahooQuote(yahooMap.get(ticker), useExtendedHours);
         if (parsed) next[ticker] = parsed;
         else missing.push(ticker);
       }
       const metricResults = await Promise.all(
-        tickers.map((ticker) =>
+        usTickers.map((ticker) =>
           fetchFinnhubJson('stock/metric', { symbol: ticker, metric: 'all' })
             .then((data) => ({ ticker, metrics: parseFinnhubMetrics(data) }))
             .catch(() => ({ ticker, metrics: {} }))
@@ -479,8 +500,9 @@ export function usePortfolioApp() {
         }
       }
       if (missing.length) {
+        const usMissing = missing.filter((ticker) => !isKoreanTicker(ticker));
         const fallbackResults = await Promise.all(
-          missing.map((ticker) =>
+          usMissing.map((ticker) =>
             fetch(`/api/finnhub/quote?symbol=${encodeURIComponent(ticker)}`, {
               headers: { Authorization: `Bearer ${token}` },
             })
@@ -547,6 +569,34 @@ export function usePortfolioApp() {
       forwardPE: numberValue(item.forwardPE) ?? undefined,
       regularMarketVolume: numberValue(item.regularMarketVolume) ?? undefined,
       averageVolume: numberValue(item.averageVolume) ?? undefined,
+    };
+  }
+
+  function isKoreanTicker(ticker: string) {
+    return /^[0-9][0-9A-Z]{5}$/.test(ticker);
+  }
+
+  function parseKoreanQuote(raw: unknown, exchangeRate: number): Price | null {
+    if (!raw || typeof raw !== 'object' || !exchangeRate) return null;
+    const item = raw as Record<string, unknown>;
+    const nativePrice = numberValue(item.price);
+    if (!nativePrice) return null;
+    const nativePrevClose = numberValue(item.prevClose) ?? nativePrice;
+    const price = nativePrice / exchangeRate;
+    const prevClose = nativePrevClose / exchangeRate;
+    const changePercent = numberValue(item.changePercent) ?? percentFromPrev(nativePrice, nativePrevClose);
+    return {
+      price,
+      nativePrice,
+      nativePrevClose,
+      currency: 'KRW',
+      changePercent,
+      regularChangePercent: changePercent,
+      prevClose,
+      session: 'regular',
+      source: 'naver',
+      regularPrice: price,
+      regularMarketVolume: numberValue(item.volume) ?? undefined,
     };
   }
 

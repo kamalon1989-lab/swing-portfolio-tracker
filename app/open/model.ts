@@ -4,12 +4,15 @@ export type Tab = 'portfolio' | 'assets' | 'watchlist' | 'journal' | 'paper';
 export type PriceSession = 'pre' | 'regular' | 'post' | 'closed';
 export type Price = {
   price: number;
+  nativePrice?: number;
+  nativePrevClose?: number;
+  currency?: Currency;
   changePercent?: number;
   regularChangePercent?: number;
   extendedChangePercent?: number;
   prevClose?: number;
   session?: PriceSession;
-  source?: 'yahoo' | 'finnhub' | 'demo';
+  source?: 'yahoo' | 'finnhub' | 'naver' | 'demo';
   regularPrice?: number;
   extendedPrice?: number;
   marketCap?: number;
