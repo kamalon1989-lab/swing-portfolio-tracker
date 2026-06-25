@@ -134,18 +134,20 @@ export function TradeForm({
   const feeAmount = toBaseCurrency(feeAmountInput, currency, rate);
   function submit(e: FormEvent) {
     e.preventDefault();
-    const basePrice = toBaseCurrency(Number(form.price) || 0, currency, rate);
-    const baseFee = feeAmount;
-    form.currency = currency;
-    form.inputPrice = form.price || undefined;
-    form.inputFee = feeAmountInput || undefined;
-    form.price = basePrice;
-    form.fee = baseFee;
+    const enteredPrice = Number(form.price) || 0;
+    const normalized: JournalItem = {
+      ...form,
+      currency,
+      inputPrice: enteredPrice || undefined,
+      inputFee: feeAmountInput || undefined,
+      price: toBaseCurrency(enteredPrice, currency, rate),
+      fee: feeAmount,
+    };
     if (isCashFlow) {
-      onSave({ ...form, ticker: 'CASH', shares: 1, fee: 0, strategy: form.action === 'deposit' ? '예수금 입금' : '예수금 출금' }, true);
+      onSave({ ...normalized, ticker: 'CASH', shares: 1, fee: 0, strategy: normalized.action === 'deposit' ? '예수금 입금' : '예수금 출금' }, true);
       return;
     }
-    onSave({ ...form, fee: feeAmount }, sync);
+    onSave(normalized, sync);
   }
   return (
     <Modal title={item ? '거래 수정' : '거래 추가'} onClose={onClose}>

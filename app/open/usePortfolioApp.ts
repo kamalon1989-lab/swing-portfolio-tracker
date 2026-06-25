@@ -776,16 +776,32 @@ export function usePortfolioApp() {
             return prev.map((x, i) => {
               if (i !== idx) return x;
               const totalShares = x.shares + trade.shares;
+              const avgCost = ((x.shares * x.avgCost) + (trade.shares * trade.price)) / totalShares;
+              const inputAvgCost = trade.currency === 'KRW' && rate
+                ? avgCost * rate
+                : trade.currency === 'USD'
+                  ? avgCost
+                  : x.inputAvgCost;
               return {
                 ...x,
                 shares: totalShares,
-                avgCost: ((x.shares * x.avgCost) + (trade.shares * trade.price)) / totalShares,
+                avgCost,
+                currency: trade.currency ?? x.currency ?? 'USD',
+                inputAvgCost,
                 buyDate: x.buyDate || trade.date,
                 lastBuyDate: trade.date,
               };
             });
           }
-          return [...prev, { ticker: trade.ticker, shares: trade.shares, avgCost: trade.price, buyDate: trade.date, lastBuyDate: trade.date }];
+          return [...prev, {
+            ticker: trade.ticker,
+            shares: trade.shares,
+            avgCost: trade.price,
+            currency: trade.currency ?? 'USD',
+            inputAvgCost: trade.inputPrice ?? trade.price,
+            buyDate: trade.date,
+            lastBuyDate: trade.date,
+          }];
         }
         if (idx < 0) return prev;
         return prev

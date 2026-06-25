@@ -346,10 +346,10 @@ export default function OpenPage() {
       )}
 
       {showSizingForm && <PositionSizingForm totalAsset={summary.totalAsset} onClose={() => setShowSizingForm(false)} />}
-      {showHoldingForm && <HoldingForm item={editingHolding} defaultCurrency={krw ? 'KRW' : 'USD'} rate={rate} onClose={() => setShowHoldingForm(false)} onSave={saveHolding} />}
-      {showWatchForm && <WatchForm item={editingWatch} defaultCurrency={krw ? 'KRW' : 'USD'} rate={rate} onClose={() => setShowWatchForm(false)} onSave={saveWatch} />}
-      {showTradeForm && <TradeForm item={editingTrade} defaultCurrency={krw ? 'KRW' : 'USD'} rate={rate} onClose={() => setShowTradeForm(false)} onSave={saveTrade} />}
-      {showPaperAccountForm && <PaperAccountForm item={editingPaperAccount} defaultCurrency={krw ? 'KRW' : 'USD'} rate={rate} onClose={() => setShowPaperAccountForm(false)} onSave={savePaperAccount} />}
+      {showHoldingForm && <HoldingForm item={editingHolding} defaultCurrency="USD" rate={rate} onClose={() => setShowHoldingForm(false)} onSave={saveHolding} />}
+      {showWatchForm && <WatchForm item={editingWatch} defaultCurrency="USD" rate={rate} onClose={() => setShowWatchForm(false)} onSave={saveWatch} />}
+      {showTradeForm && <TradeForm item={editingTrade} defaultCurrency="USD" rate={rate} onClose={() => setShowTradeForm(false)} onSave={saveTrade} />}
+      {showPaperAccountForm && <PaperAccountForm item={editingPaperAccount} defaultCurrency="USD" rate={rate} onClose={() => setShowPaperAccountForm(false)} onSave={savePaperAccount} />}
       {showPaperTradeForm && <PaperTradeForm item={editingPaperTrade} accountId={selectedPaperAccountId || paperAccounts[0]?.id || ''} accounts={paperAccounts} onClose={() => setShowPaperTradeForm(false)} onSave={savePaperTrade} />}
       {showCashForm && <CashForm cashUsd={cashUsd} cashKrw={cashKrw} rate={rate} onClose={() => setShowCashForm(false)} onSave={saveCash} />}
       {showRecordForm && <RecordDateForm onClose={() => setShowRecordForm(false)} onSave={recordToday} />}
